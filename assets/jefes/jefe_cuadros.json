@@ -1,0 +1,47 @@
+{
+ "minibus": {
+  "ancho": 218,
+  "alto": 90,
+  "cuadros": 6
+ },
+ "jefe": {
+  "ancho": 88,
+  "alto": 79,
+  "pose": [
+   0,
+   1
+  ],
+  "caminar": [
+   2,
+   13
+  ],
+  "ataque": [
+   14,
+   19
+  ],
+  "revive": [
+   20,
+   25
+  ]
+ },
+ "gigante": {
+  "ancho": 160,
+  "alto": 125,
+  "aparece": [
+   0,
+   1
+  ],
+  "caminar": [
+   2,
+   8
+  ],
+  "ataque": [
+   9,
+   12
+  ],
+  "muerte": [
+   13,
+   16
+  ]
+ }
+}

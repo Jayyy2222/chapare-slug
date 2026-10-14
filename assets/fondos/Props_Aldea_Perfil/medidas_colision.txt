@@ -1,0 +1,26 @@
+Medidas en pixeles, con origen (0,0) en la esquina superior izquierda de cada PNG.
+Son aproximadas: ajustalas con el debug de fisica.
+
+muelle.png (216x83)
+  - piso de tablones (one-way): y = 29, de x = 0 a x = 216
+  - los pilotes llegan hasta y = 83 (base que va dentro del agua)
+
+choza_palafito.png (149x188)
+  - piso de la choza (one-way): y = 118, de x = 0 a x = 149
+  - techo de paja (one-way, opcional): y = 2, de x = 0 a x = 149
+  - escalera (zona para subir con ARRIBA): x = 62 a 88, y = 118 a 188
+  - puerta (zona para entrar con ARRIBA): x = 50 a 78, y = 60 a 118
+  - base de los pilotes: y = 188
+
+casa_destruida.png (159x183)
+  - piso superior roto (one-way): y = 74, de x = 0 a x = 159
+  - puerta de abajo (zona para entrar): x = 58 a 96, y = 125 a 183
+  - base: y = 183
+
+torre_vigia.png (114x154)
+  - plataforma de arriba (one-way): y = 22, de x = 0 a x = 114
+  - escalera: x = 70 a 97, y = 22 a 154
+  - base: y = 154
+
+barricada_llantas_turriles.png (188x52)  -> cobertura solida, altura 52
+canoa.png (178x33)                        -> flota en el rio, sin colision o one-way en y = 6
