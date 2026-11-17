@@ -1,0 +1,42 @@
+{
+  "paraba": {
+    "ancho": 105,
+    "alto": 69,
+    "cuadros": 4
+  },
+  "mariposa": {
+    "ancho": 43,
+    "alto": 32,
+    "cuadros": 2
+  },
+  "bandada": {
+    "ancho": 65,
+    "alto": 32,
+    "cuadros": 1
+  },
+  "brillo": {
+    "ancho": 36,
+    "alto": 38,
+    "cuadros": 3
+  },
+  "niebla1": {
+    "ancho": 456,
+    "alto": 16,
+    "cuadros": 1
+  },
+  "niebla2": {
+    "ancho": 456,
+    "alto": 22,
+    "cuadros": 1
+  },
+  "niebla3": {
+    "ancho": 960,
+    "alto": 14,
+    "cuadros": 1
+  },
+  "niebla4": {
+    "ancho": 960,
+    "alto": 21,
+    "cuadros": 1
+  }
+}

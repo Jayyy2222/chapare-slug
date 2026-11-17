@@ -30,7 +30,7 @@ FRANJA_ARRIBA = 12     # px de borde oscuro arriba de la hoja
 FRANJA_ABAJO = 4       # y la línea de abajo
 MANCHA_MINIMA = 2000   # px: menos que esto es un detalle suelto, no un cuadro
 ALTO_FILA = 185        # px aproximados de cada fila, para ordenar los cuadros
-ALTO_ARTE = 52         # px de arte del cuadro más alto, como los rehenes
+ALTO_ARTE = 64         # px de arte del cuadro más alto: parado ~60, como los rehenes
 MARGEN = 4
 LEJOS = 30             # px: un detalle más lejos de todo cuadro se descarta
 

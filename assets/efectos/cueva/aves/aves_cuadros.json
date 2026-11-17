@@ -1,0 +1,56 @@
+{
+ "vuelo": {
+  "ancho": 95,
+  "alto": 125,
+  "cuadros": 6,
+  "ancla": [
+   94,
+   0
+  ]
+ },
+ "grito": {
+  "ancho": 136,
+  "alto": 56,
+  "cuadros": 7,
+  "ancla": [
+   135,
+   56
+  ]
+ },
+ "muerte": {
+  "ancho": 97,
+  "alto": 70,
+  "cuadros": 8,
+  "ancla": [
+   49,
+   70
+  ]
+ },
+ "jefeVuelo": {
+  "ancho": 202,
+  "alto": 163,
+  "cuadros": 8,
+  "ancla": [
+   201,
+   -1
+  ]
+ },
+ "jefeAtaque": {
+  "ancho": 250,
+  "alto": 180,
+  "cuadros": 7,
+  "ancla": [
+   249,
+   -4
+  ]
+ },
+ "jefeMuerte": {
+  "ancho": 266,
+  "alto": 168,
+  "cuadros": 7,
+  "ancla": [
+   144,
+   168
+  ]
+ }
+}

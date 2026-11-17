@@ -1,0 +1,223 @@
+{
+ "piernas_run": {
+  "ancho": 71,
+  "alto": 60,
+  "ancla": [
+   45,
+   5
+  ],
+  "cuadros": [
+   {
+    "pies": 56
+   },
+   {
+    "pies": 59
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 59
+   },
+   {
+    "pies": 58
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 56
+   },
+   {
+    "pies": 56
+   }
+  ]
+ },
+ "piernas_salto": {
+  "ancho": 56,
+  "alto": 74,
+  "ancla": [
+   32,
+   3
+  ],
+  "cuadros": [
+   {
+    "pies": 52
+   },
+   {
+    "pies": 73
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 68
+   },
+   {
+    "pies": 52
+   },
+   {
+    "pies": 56
+   }
+  ]
+ },
+ "piernas_crouch": {
+  "ancho": 49,
+  "alto": 55,
+  "ancla": [
+   28,
+   4
+  ],
+  "cuadros": [
+   {
+    "pies": 54
+   },
+   {
+    "pies": 47
+   },
+   {
+    "pies": 41
+   }
+  ]
+ },
+ "piernas_crouch_walk": {
+  "ancho": 46,
+  "alto": 43,
+  "ancla": [
+   27,
+   2
+  ],
+  "cuadros": [
+   {
+    "pies": 42
+   },
+   {
+    "pies": 42
+   },
+   {
+    "pies": 39
+   },
+   {
+    "pies": 42
+   },
+   {
+    "pies": 42
+   },
+   {
+    "pies": 39
+   }
+  ]
+ },
+ "torso_aiming": {
+  "ancho": 53,
+  "alto": 91,
+  "ancla": [
+   28,
+   79
+  ],
+  "cuadros": [
+   {
+    "mano": [
+     42,
+     47
+    ]
+   },
+   {
+    "mano": [
+     43,
+     45
+    ]
+   },
+   {
+    "mano": [
+     43,
+     43
+    ]
+   },
+   {
+    "mano": [
+     43,
+     47
+    ]
+   }
+  ]
+ },
+ "aiming_straight_up": {
+  "ancho": 77,
+  "alto": 125,
+  "ancla": [
+   47,
+   104
+  ],
+  "cuadros": [
+   {
+    "mano": [
+     70,
+     48
+    ]
+   },
+   {
+    "mano": [
+     62,
+     33
+    ]
+   },
+   {
+    "mano": [
+     52,
+     24
+    ]
+   },
+   {
+    "mano": [
+     42,
+     15
+    ]
+   }
+  ]
+ },
+ "idle": {
+  "ancho": 54,
+  "alto": 131,
+  "ancla": [
+   27,
+   130
+  ],
+  "cuadros": [
+   {},
+   {},
+   {},
+   {},
+   {},
+   {}
+  ]
+ },
+ "trepar": {
+  "ancho": 53,
+  "alto": 145,
+  "ancla": [
+   27,
+   144
+  ],
+  "cuadros": [
+   {},
+   {},
+   {},
+   {},
+   {},
+   {}
+  ]
+ }
+}

@@ -10,6 +10,10 @@ y guarda
   cholita_sheet.png     una fila por color de pollera; en cada fila, los 8
                         cuadros de caminar y después los 6 de ataque
   cholita_rip_sheet.png la muerte (cholita_rip.png, 6 cuadros), una fila por pollera
+  cholita_quemada_sheet.png la muerte por fuego o explosión (cholita_quemad.jpeg,
+                        14 cuadros: se prende y corre, queda carbonizada, se
+                        hace ceniza, esqueleto y montoncito humeante), una fila
+                        por pollera
   cholita_cuadros.json  tamaño de celda, cuadros por fila y nombres de los colores
 
 Pasos:
@@ -37,7 +41,7 @@ from PIL import ImageFilter
 from recorte_sprites import componentes, cortar_sombra, por_manchas
 
 CARPETA = 'assets/personajes/enemigos/'
-ALTO_ARTE = 58      # px de arte del cuadro más alto: como el soldado
+ALTO_ARTE = 66      # px de arte del cuadro más alto: caminando mide 62 con el sombrero, como Manfred de pie
 MARGEN = 4
 COLORES = 40
 CUADROS = 8         # de caminar
@@ -47,6 +51,16 @@ SIN_SOMBRERO = 0.88  # el cuerpo sin sombrero mide esto del cuadro de caminar (p
 TRAMO = 60         # px (sin escalar) de pollera que tiene que haber debajo del borde
 CINTURA = 0.40      # la pollera empieza más abajo de este % de la altura del cuadro
 # Nombre y tono (0-360) de cada pollera. 'azul' es el original.
+# Cuadros de cholita_quemad.jpeg: las llamas de uno tocan al vecino, así que
+# no se separan por manchas sino por estas cajas (filas y columnas con dibujo).
+QUEMADA_CAJAS = [
+    (40, 13, 233, 344), (259, 13, 489, 344), (510, 13, 749, 344),
+    (26, 354, 268, 677), (283, 354, 532, 677), (571, 354, 726, 677),
+    (35, 690, 190, 1010), (218, 690, 373, 1010), (399, 690, 554, 1010), (579, 690, 734, 1010),
+    (28, 1035, 182, 1334), (221, 1035, 366, 1334), (391, 1035, 569, 1334), (598, 1035, 742, 1334),
+]
+QUEMADA_MONTONES = 12   # desde este cuadro, los montoncitos de ceniza
+
 POLLERAS = [
     ('azul', None),
     ('roja', 352),
@@ -216,6 +230,32 @@ def main():
     with open(CARPETA + 'cholita_cuadros.json', 'w') as f:
         json.dump(datos, f)
     print(f'cholita_rip_sheet.png: {len(rip)} cuadros de {chico[0]}x{chico[1]}')
+
+    # Quemada (ver QUEMADA_CAJAS). La escala iguala la carbonizada parada
+    # (cuadro 5, sin llamas) con caminar.
+    hoja_q = quitar_fondo(Image.open(CARPETA + 'cholita_quemad.jpeg'))
+    quemada = []
+    for i, caja in enumerate(QUEMADA_CAJAS):
+        # Los dos montoncitos de ceniza son chatos: cortar_sombra los borraría.
+        c = hoja_q.crop(caja) if i >= QUEMADA_MONTONES else cortar_sombra(hoja_q.crop(caja))
+        quemada.append(c.crop(c.getbbox()))
+    escala_q = escala * caminar[0].height / quemada[5].height
+    medio = max(max(centro_pies(c), c.width - centro_pies(c)) for c in quemada)
+    ancho = int(medio * 2) + MARGEN * 2
+    alto = max(c.height for c in quemada) + MARGEN
+    chico = (round(ancho * escala_q), round(alto * escala_q))
+    hoja = Image.new('RGBA', (chico[0] * len(quemada), chico[1] * len(POLLERAS)))
+    for i, c in enumerate(quemada):
+        celda = Image.new('RGBA', (ancho, alto))
+        celda.paste(c, (round(ancho / 2 - centro_pies(c)), alto - c.height), c)
+        mascara = mascara_pollera_suelta(celda)
+        for fila, (_, tono) in enumerate(POLLERAS):
+            hoja.paste(a_pixel_art(tenir(celda, mascara, tono), chico), (i * chico[0], fila * chico[1]))
+    hoja.save(CARPETA + 'cholita_quemada_sheet.png')
+    datos['quemada'] = {'ancho': chico[0], 'alto': chico[1], 'cuadros': len(quemada)}
+    with open(CARPETA + 'cholita_cuadros.json', 'w') as f:
+        json.dump(datos, f)
+    print(f'cholita_quemada_sheet.png: {len(quemada)} cuadros de {chico[0]}x{chico[1]}')
 
 
 if __name__ == '__main__':

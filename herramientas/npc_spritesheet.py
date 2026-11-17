@@ -26,7 +26,7 @@ CARPETA = 'assets/personajes/npc/'
 TIRAS = ['rescate', 'saledepantalla']
 TROZO_MINIMO = 20   # px: más angosto que esto se une al cuadro siguiente
 MARGEN = 4
-ESCALA_ARTE = 0.3  # el soldado mide 58 px de arte: el NPC parado ~50, sentado ~44
+ESCALA_ARTE = 0.37  # Manfred mide 62 px de arte: el NPC parado ~60 (1,70 m), sentado ~54
 COLORES = 48
 
 

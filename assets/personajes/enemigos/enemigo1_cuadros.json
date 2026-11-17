@@ -1,0 +1,15 @@
+{
+ "ancho": 84,
+ "alto": 67,
+ "caminar": 12,
+ "ataque": 4,
+ "muerte": 6,
+ "camisas": [
+  "turquesa",
+  "roja",
+  "azul",
+  "naranja",
+  "gris",
+  "morada"
+ ]
+}

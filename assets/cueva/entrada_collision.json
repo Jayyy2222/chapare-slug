@@ -1,0 +1,40 @@
+{
+ "nivel": "Nivel1: entrada a la Cueva de los Gu\u00e1charos",
+ "nota": "px del mundo de Nivel1. Editar en el juego con la tecla E (frente a la cueva).",
+ "ground": [
+  {
+   "x0": 4747,
+   "y0": 528,
+   "x1": 5393,
+   "y1": 528
+  }
+ ],
+ "platforms": [],
+ "walls": [
+  {
+   "x": 5292,
+   "y": 288,
+   "w": 101,
+   "h": 240
+  }
+ ],
+ "ladders": [],
+ "gotas": [
+  [
+   5032,
+   353
+  ],
+  [
+   5102,
+   353
+  ],
+  [
+   5167,
+   353
+  ],
+  [
+   5232,
+   353
+  ]
+ ]
+}

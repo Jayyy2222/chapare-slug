@@ -1,4 +1,4 @@
-# Assets — Chapare Slug
+# Assets — BOLIVIA SLUG
 
 Coloca aquí los recursos gráficos y de audio. Formatos recomendados: PNG (con transparencia) para sprites, MP3/OGG para audio.
 

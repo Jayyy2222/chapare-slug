@@ -1,4 +1,4 @@
-# Chapare Slug
+# BOLIVIA SLUG
 
 Juego de acción y plataformas estilo Metal Slug hecho con Phaser 3.
 

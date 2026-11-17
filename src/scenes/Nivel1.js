@@ -36,14 +36,21 @@ const SUELO_Y = 16;
 //   H  rehén   *  power-up   x  caja   s  sacos   J  inicio   F  meta (sin uso: el
 //   nivel termina en la puerta del edificio final, ver PROPS_NIVEL1)
 //   C  cholita (enemigo que patrulla)   N  NPC que regala una hamburguesa (power-up)
+//   E  soldado (enemigo1: patrulla y dispara; Soldados.js)
+//   En las columnas CUEVA_NIVEL1 hay un peñón de roca de arriba abajo: se
+//   cruza solo por la cueva (escena Cueva), que sale del otro lado.
+//   W  caja de armas (se abre a balazos o tocándola; trae un arma: CAJAS_NIVEL1, Armas.js)
+// Qué arma trae cada caja de armas (W), de izquierda a derecha.
+const CAJAS_NIVEL1 = ['ak47', 'escopeta', 'machete', 'lanzallamas', 'ametralladora', 'lanzacohetes'];
+
 const MAPA_NIVEL1 = [
-  '..........*.............................................................', // 0 (y = 0)
-  '...............................H.................*......................', // 1 (y = 128)
-  '...........x.......H..................T.................................', // 2 (y = 256)
-  '.J.Ns.H..C.x.....................Cs.N.T...C.H....C.....HC..C.s..........', // 3 (y = 384)
-  'SSSSSSSSSSSSSS34......H.....12SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS', // 4 (y = 512)
-  'SSSSSSSSSSSSSSSS\\AAAAAAAAAA/SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS', // 5 (y = 640)
-  'SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS' // 6 (y = 768)
+  '..........*............................SSS.................................', // 0 (y = 0)
+  '...............................H.......SSS..........*......................', // 1 (y = 128)
+  '...........x.......H...................SSS.................................', // 2 (y = 256)
+  '.J.Ns.H.WC.xEE.E..............W.EEsEN..SSSW.EC.HEEW.E.EWE.HE.EC.sWEE..EE.E.', // 3 (y = 384)
+  'SSSSSSSSSSSSSS34......H.....12SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS', // 4 (y = 512)
+  'SSSSSSSSSSSSSSSS\\AAAAAAAAAA/SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS', // 5 (y = 640)
+  'SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS' // 6 (y = 768)
 ];
 
 // Rampas: hacia dónde sube (1 = hacia la derecha) y altura de la línea de
@@ -147,8 +154,9 @@ const LECHO_RIO = { sube: 0 }; // "rampa" del lecho: sin cambio de velocidad
 // y llevadas a la escala de arte con herramientas/npc_spritesheet.py (ver
 // npc_cuadros.json). Se dibujan a x2, como el soldado.
 const NPC = {
-  ancho: 79, alto: 52,               // celda de los spritesheets (px de arte)
-  cuerpo: { ancho: 22, alto: 38 },   // caja de colisión (px de arte), apoyada en los pies
+  // Del tamaño de Manfred: parados ~60 px de arte (herramientas/npc_spritesheet.py).
+  ancho: 97, alto: 64,               // celda de los spritesheets (px de arte)
+  cuerpo: { ancho: 27, alto: 47 },   // caja de colisión (px de arte), apoyada en los pies
   velocidadHuida: 260,               // corre hacia la izquierda hasta salir del mapa
   saludo: 600                        // ms que se queda saludando antes de correr
 };
@@ -157,10 +165,11 @@ const NPC = {
 // spritesheet por herramientas/npc_power_spritesheet.py (17 cuadros en una
 // fila, ver npc_power_cuadros.json). Espera saludando; al tocarlo el jugador
 // saca una hamburguesa, se la da (cuenta como power-up), salta de alegría,
-// hace la venia y se va corriendo.
+// hace la venia y desaparece en una nube de humo.
 const NPC_POWER = {
-  ancho: 58, alto: 52,                 // celda del spritesheet (px de arte)
-  cuerpo: { ancho: 22, alto: 40 },     // caja de colisión (px de arte), apoyada en los pies
+  // Del tamaño de Manfred: parado ~60 px de arte (herramientas/npc_power_spritesheet.py).
+  ancho: 72, alto: 64,                 // celda del spritesheet (px de arte)
+  cuerpo: { ancho: 27, alto: 49 },     // caja de colisión (px de arte), apoyada en los pies
   cuadros: {
     espera: [0, 0, 0, 0, 2, 0, 0, 0],  // parado, cada tanto se acomoda
     saluda: [1, 3, 1, 3, 4, 3],        // agita la mano cuando el jugador se acerca
@@ -170,7 +179,7 @@ const NPC_POWER = {
     corre: [14, 15, 16]
   },
   cercania: 260,                       // px a los que empieza a saludar
-  salto: 46,                           // px que sube al festejar
+  salto: 56,                           // px que sube al festejar
   velocidadHuida: 240                  // corre hacia la derecha hasta salir de la pantalla
 };
 
@@ -182,14 +191,21 @@ const NPC_POWER = {
 // cerca le pegan con la bolsa. Tocarla o recibir el bolsazo empuja al
 // jugador; caerle encima o dispararle la deja fuera de combate.
 const CHOLITA = {
-  ancho: 63, alto: 60,               // celda del spritesheet (px de arte)
+  // Del tamaño de Manfred: caminando mide 62 px de arte con el sombrero
+  // (herramientas/cholita_spritesheet.py).
+  ancho: 72, alto: 68,               // celda del spritesheet (px de arte)
   caminar: 8, ataque: 6,             // cuadros de cada fila: primero caminar, después ataque
-  rip: { ancho: 51, alto: 55, cuadros: 6 }, // la muerte (cholita_rip_sheet.png): otra hoja, una fila por pollera
+  rip: { ancho: 58, alto: 63, cuadros: 6 }, // la muerte (cholita_rip_sheet.png): otra hoja, una fila por pollera
+  // La muerte por fuego o explosión (cholita_quemada_sheet.png, una fila por
+  // pollera): se prende y corre (0-4), carbonizada (5-9), ceniza (10-11),
+  // esqueleto y montoncito (12-13). `corre`: px que corre prendida fuego.
+  quemada: { ancho: 66, alto: 69, cuadros: 14, corre: 110,
+    secuencia: [0, 1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] },
   golpe: 3,                          // cuadro del ataque en que la bolsa pega
-  alcance: 95,                       // px (entre centros) desde los que ataca
+  alcance: 108,                      // px (entre centros) desde los que ataca
   pausaAtaque: 1300,                 // ms entre un bolsazo y el siguiente
   polleras: ['azul', 'roja', 'verde', 'morada', 'rosada', 'naranja'],
-  cuerpo: { ancho: 18, alto: 44 },   // caja de colisión (px de arte), apoyada en los pies
+  cuerpo: { ancho: 20, alto: 50 },   // caja de colisión (px de arte), apoyada en los pies
   velocidad: 70,                     // caminando de ronda
   persecucion: 140,                  // corriendo al jugador
   ronda: 220,                        // px a cada lado de donde aparece
@@ -201,7 +217,9 @@ const CHOLITA = {
 // imagen sin escalar:
 //   pisos:     [x0, x1, y]      plataformas one-way de 6 px
 //   escaleras: [x0, x1, yArriba] bajan hasta el suelo (se sube con ARRIBA)
-//   solidos:   [x0, x1, yArriba] cobertura sólida hasta la base
+//   solidos:   [x0, x1, yArriba] cobertura (barricadas): como en Metal Slug se
+//                                atraviesa caminando y su parte de arriba es
+//                                una plataforma one-way (se puede subir saltando)
 //   pilotes:   [x0, x1]          columnas que se alargan hasta el suelo o el
 //                                lecho si no llegan (nunca se sube el objeto)
 //   puerta:    [x0, x1, yArriba, yAbajo] zona para entrar con ARRIBA al
@@ -223,13 +241,20 @@ const PROPS = {
     pisos: [[0, 114, 22]], escaleras: [[70, 97, 22]], detras: true,
     pilotes: [[2, 9], [36, 43], [72, 79], [86, 90], [100, 104], [107, 114]]
   },
-  barricada_llantas_turriles: { solidos: [[0, 188, 0]] },
+  // Cobertura con el perfil de arriba de la imagen (si fuera una sola línea
+  // a la altura de la pila de llantas, sobre los sacos se vería flotando):
+  // llantas chicas, pila de llantas, llantas apoyadas, turriles y sacos.
+  barricada_llantas_turriles: { solidos: [[4, 22, 19], [22, 56, 2], [56, 80, 10], [80, 139, 8], [139, 174, 23]] },
   canoa: { pisos: [[10, 168, 6]], flota: true },
   // Casa de ladrillo (assets/fondos/casa.jpeg, limpiada con
   // herramientas/casa_ladrillo.py). base: fila de la imagen que va en el suelo
   // (debajo quedan los escombros). Se trepa por la cornisa del medio hasta la
-  // terraza: una ruta de arriba más en la aldea.
-  casa_ladrillo: { ruta: 'assets/fondos/lvl1/', base: 246, pisos: [[22, 448, 140], [12, 455, 51]] },
+  // terraza: una ruta de arriba más en la aldea. Por la puerta de metal se
+  // entra a su interior (assets/fondos/interior_casa.jpeg).
+  casa_ladrillo: {
+    ruta: 'assets/fondos/lvl1/', base: 246, pisos: [[22, 448, 140], [12, 455, 51]],
+    puerta: [76, 117, 170, 246], interior: 'casa_ladrillo'
+  },
   // Edificio del final (assets/fondos/final/edif_final.jpeg, limpiado con
   // herramientas/edificio_final.py). Su puerta lleva a la pelea con el jefe
   // (escena JefeFinal); el umbral es el pie de la escalera.
@@ -254,15 +279,15 @@ const PROPS_NIVEL1 = [
   // Aldea (3840-6000): casa y chozas alternadas, barricada y una torre.
   { prop: 'casa_destruida', x: 4150 },
   { prop: 'choza_palafito', x: 4620, espejo: true, escala: 0.95, tinte: 0xe0e6d4 },
-  { prop: 'casa_ladrillo', x: 5330 },
-  { prop: 'barricada_llantas_turriles', x: 5980, espejo: true, escala: 0.9 },
+  { prop: 'casa_ladrillo', x: 5800, escala: 0.85 }, // más chica: entra entre el peñón y la barricada
+  { prop: 'barricada_llantas_turriles', x: 6364, espejo: true, escala: 0.9 },
   // Campamento (6000-8192): torre, casa grande y dos barricadas.
-  { prop: 'torre_vigia', x: 6280, espejo: true },
-  { prop: 'casa_destruida', x: 6600, espejo: true, escala: 1.1, tinte: 0xe8e2d8 },
-  { prop: 'barricada_llantas_turriles', x: 6950 },
-  { prop: 'torre_vigia', x: 7250, escala: 0.9, tinte: 0xe4e8d8 },
+  { prop: 'torre_vigia', x: 6664, espejo: true, enemigo: true },
+  { prop: 'casa_destruida', x: 6984, espejo: true, escala: 1.1, tinte: 0xe8e2d8 },
+  { prop: 'barricada_llantas_turriles', x: 7334 },
+  { prop: 'torre_vigia', x: 7634, escala: 0.9, tinte: 0xe4e8d8, enemigo: true },
   // Final (8192-9216): el edificio del jefe.
-  { prop: 'edif_final', x: 8704, escala: 0.7 }
+  { prop: 'edif_final', x: 9088, escala: 0.7 }
 ];
 
 // Copias lejanas sin colisión, entre los árboles (parallax 0.6). x en la capa.
@@ -272,10 +297,66 @@ const PROPS_FONDO = {
   x: 0.6, y: 0.4, escala: 0.6, alfa: 0.8, tinte: 0x9fa88a, base: 440,
   lista: [['torre_vigia', 300], ['choza_palafito', 3350], ['casa_destruida', 3900], ['torre_vigia', 4450], ['choza_palafito', 5000]]
 };
+// Fogatas de rebeldes en esa misma capa lejana (solo decorado, como en Metal
+// Slug): la fogata con su humo, uno atizando y otro que cada `ciclo` ms sopla,
+// el fuego se aviva y se aparta mirando. x en la capa (herramientas/fogata.py).
+const FOGATAS_FONDO = { lista: [650, 4720], ciclo: 7000, brillo: 0xff9a3a };
+
+// El peñón de la cueva: columnas del mapa (llenas de 'S' de arriba abajo).
+// Por la boca de la Cueva de los Guácharos de la izquierda (caminando hasta el
+// fondo, ver ENTRADA_CUEVA) se entra a la escena Cueva; al salir de ella se aparece del otro lado del peñón y sigue la otra
+// mitad del mapa. La cámara no pasa del peñón: desde un lado nunca se ve el
+// otro (el peñón es más angosto que la pantalla).
+const CUEVA_NIVEL1 = { col: 39, columnas: 3 };
+
+// Entrada a la Cueva de los Guácharos (assets/cueva/, de
+// assets/fondos/cueva/cueva_front_back.jpeg con herramientas/entrada_cueva.py;
+// van a escala 1). En px de la textura: ancho/alto de cueva_back y
+// cueva_front, piso (y del piso) y boca (x donde empieza la abertura: cae
+// sobre el borde del peñón). El fondo es la pared del JSON. Se camina hacia adentro (el piso baja en pendiente: la línea de
+// assets/cueva/entrada_collision.json, editable con la tecla E) y en el fondo
+// oscuro se pasa a la escena Cueva.
+//   hueco    celdas del peñón sin colisión (adentro manda el JSON)
+//   rocas    rocas sueltas: x respecto del borde del peñón (px del mundo),
+//            delante o detrás del jugador
+//   tunel    parallax del interior de la cueva (más lento: está más lejos)
+//   oscuro   alpha del negro en el fondo; tinte: el del jugador al fondo
+//   sonido   distancia (px) desde la que se oye y volumen máximo
+const ENTRADA_CUEVA = {
+  ancho: 646, alto: 241, piso: 229, boca: 245,
+  hueco: [[39, 3], [40, 3], [41, 3]],
+  // Celdas del peñón que no se dibujan: las tapa la colina (siguen sólidas).
+  sinDibujo: [[39, 0], [40, 0], [41, 0], [39, 1], [40, 1], [41, 1], [39, 2], [40, 2], [41, 2]],
+  // Rocas sueltas (x respecto de la boca): delante o detrás del jugador.
+  rocas: [{ img: 'roca_1', x: -34, delante: true }, { img: 'roca_3', x: 30, delante: false }, { img: 'roca_2', x: 92, delante: true }],
+  // Sobre el contorno de la ladera (x en cueva_back): helechos y piedras.
+  ladera: [[40, 'helecho'], [78, 'piedra'], [112, 'helecho'], [150, 'piedra']],
+  // Colina de arriba: x de su borde izquierdo (en la textura de la cueva),
+  // parallax, árboles detrás de la cresta [dx, cuadro, escala] y lianas que
+  // cuelgan sobre el arco [dx respecto de la boca, largo].
+  // Colina de arriba (herramientas/entrada_cueva.py: cueva_colina, del mismo
+  // ancho que la cueva): solape = px de su pie bajo el borde de arriba de la
+  // cueva (fundido); árboles detrás [x, cuadro, escala] con el pie
+  // `pieArboles` px bajo la cresta (los tapa la colina), su parallax, y las
+  // lianas [dx desde la boca, largo].
+  colina: {
+    solape: 42, factor: 0.9, pieArboles: 60,
+    arboles: [[260, 0, 1.0], [420, 2, 1.1], [580, 1, 0.95]],
+    lianas: [[40, 0.4], [150, 0.55], [235, 0.35]]
+  },
+
+
+  tunel: 1,        // el interior va pegado a la cueva (con parallax el piso se partía)
+  // oscuro: alpha del negro adentro (llega rápido, desde la misma boca: la
+  // sombra del arco); tinte: el del jugador y los enemigos al fondo.
+  oscuro: 0.96, tinte: 0x3a3a4a,
+  sonido: { alcance: 720, volumen: 0.5 }
+};
+
 const ESCALERA = { velocidad: 160 };
 
 // Sombras de contacto: elipse negra semitransparente pegada al suelo.
-const SOMBRA = { alfa: 0.35, alto: 6, jugador: 58, rehen: 64, cholita: 56, npcPower: 60, alturaMaxima: 260 };
+const SOMBRA = { alfa: 0.35, alto: 6, jugador: 58, rehen: 78, cholita: 64, npcPower: 74, alturaMaxima: 260 };
 
 const CAMARA = { bajarJugador: 140 }; // px que el jugador queda por debajo del centro
 
@@ -307,18 +388,34 @@ class Nivel1 extends Phaser.Scene {
     Object.entries(PROPS).forEach(([nombre, datos]) =>
       this.load.image(nombre, `${datos.ruta || 'assets/fondos/Props_Aldea_Perfil/'}${nombre}.png`));
     this.load.image('cajaChica', lvl1 + 'caja_chica.png');
+    this.load.spritesheet('fogata', 'assets/efectos/fogata.png', { frameWidth: 42, frameHeight: 45 });
+    this.load.spritesheet('fogataHumo', 'assets/efectos/fogata_humo.png', { frameWidth: 22, frameHeight: 177 });
+    this.load.spritesheet('rebeldes', 'assets/efectos/rebeldes.png', { frameWidth: 51, frameHeight: 33 });
 
     const celdaNpc = { frameWidth: NPC.ancho, frameHeight: NPC.alto };
     this.load.spritesheet('npcRescate', 'assets/personajes/npc/rescate_sheet.png', celdaNpc);
     this.load.spritesheet('npcSale', 'assets/personajes/npc/saledepantalla_sheet.png', celdaNpc);
+    cargarSoldados(this); // Soldados.js
     this.load.spritesheet('cholita', 'assets/personajes/enemigos/cholita_sheet.png', { frameWidth: CHOLITA.ancho, frameHeight: CHOLITA.alto });
     this.load.spritesheet('cholitaRip', 'assets/personajes/enemigos/cholita_rip_sheet.png', { frameWidth: CHOLITA.rip.ancho, frameHeight: CHOLITA.rip.alto });
+    this.load.spritesheet('cholitaQuemada', 'assets/personajes/enemigos/cholita_quemada_sheet.png', { frameWidth: CHOLITA.quemada.ancho, frameHeight: CHOLITA.quemada.alto });
 
     cargarMusica(this, 'nivel1');
     this.load.spritesheet('npcPower', 'assets/personajes/npc/npc_power_sheet.png', { frameWidth: NPC_POWER.ancho, frameHeight: NPC_POWER.alto });
     this.load.spritesheet('jugador', 'assets/personajes/jugador/1_sheet_calido.png', { frameWidth: 84, frameHeight: 84 });
     // Segundo jugador (herramientas/manfred_spritesheet.py).
     this.load.spritesheet('jugadorManfred', 'assets/personajes/jugador/manfred_sheet_calido.png', { frameWidth: 84, frameHeight: 84 });
+    cargarTuto(this); // Tuto: piernas, torso y cuerpo entero (CuerpoTuto.js)
+    // Entrada a la cueva (herramientas/entrada_cueva.py).
+    ['cueva_back', 'cueva_front', 'cueva_tunel', 'cueva_hueco', 'cueva_colina', 'roca_1', 'roca_2', 'roca_3', 'roca_4'].forEach((n) => this.load.image('entrada_' + n, `assets/cueva/${n}.png`));
+    this.load.json('entradaColision', 'assets/cueva/entrada_collision.json');
+    // La barra espaciadora del cartel de mareado (Jugador.aturdirJugador).
+    this.load.image('teclaEspacio', 'assets/mecanicas/espacio/espacio_tecla.png');
+    cargarAves(this);  // guácharos de la boca de la cueva (Cueva.js)
+    cargarArmas(this); // AK-47 y caja de armas (Armas.js); también para Interior
+    cargarEfectos(this); // explosiones y sangre (Efectos.js); también para JefeFinal
+    // Panel de vida (herramientas/vida_panel.py); lo usan también Interior y JefeFinal.
+    this.load.spritesheet('panelVida', 'assets/panel/vida_sheet.png', { frameWidth: 455, frameHeight: 107 });
   }
 
   create() {
@@ -329,6 +426,9 @@ class Nivel1 extends Phaser.Scene {
     this.rnd = new Phaser.Math.RandomDataGenerator(['nivel1']);
 
     this.cameras.main.setBounds(0, 0, this.anchoNivel, this.altoNivel).setBackgroundColor(0xb9ab6a);
+    // El tope de la cámara en el peñón se pone en el primer update (también
+    // al reiniciar la escena después de morir: si no, quedaba sin tope).
+    this.ladoPenon = null;
     this.physics.world.setBounds(0, 0, this.anchoNivel, this.altoNivel);
 
     this.crearTexturasProvisionales();
@@ -336,7 +436,7 @@ class Nivel1 extends Phaser.Scene {
 
     // Grupos de cuerpos estáticos.
     this.suelo = this.physics.add.staticGroup();       // piedra del mapa (S)
-    this.obstaculos = this.physics.add.staticGroup();  // cobertura sólida: barricadas
+    this.obstaculos = this.physics.add.staticGroup();  // bloques sólidos (hoy ninguno: las barricadas son pasarelas)
     this.pasarelas = this.physics.add.staticGroup();   // un solo sentido: ramas y losas
 
     // Orden de dibujo: cuevas y árboles detrás del terreno, el agua delante del jugador.
@@ -345,6 +445,7 @@ class Nivel1 extends Phaser.Scene {
     this.crearCuevas();
     this.crearArbolesJuego();
     this.crearProps();        // detrás del terreno: el puente tapa el techo de la choza
+    this.crearCueva();
     this.crearTerreno();
     this.crearRios();
     this.crearCaminoTierra();
@@ -353,14 +454,16 @@ class Nivel1 extends Phaser.Scene {
     this.crearObstaculos();
     this.crearRecompensas();
     this.crearJugador();
+    this.crearCajasArmas();
     this.crearEnemigos();
     this.crearPrimerPlano();
     this.crearHUD();
 
     this.teclas = this.input.keyboard.createCursorKeys();
-    this.teclasExtra = this.input.keyboard.addKeys('A,D,W,S,SPACE,J,X');
+    this.teclasExtra = this.input.keyboard.addKeys('A,D,W,S,SPACE,J,X,TAB');
 
     this.crearFlechaPuerta();
+    this.crearEditor(); // Cueva.js: editor de colisión (tecla E) para la entrada a la cueva
     this.events.on('wake', (sys, datos) => this.volverDeInterior(datos));
 
     tocarMusica(this, 'nivel1');
@@ -398,6 +501,16 @@ class Nivel1 extends Phaser.Scene {
       this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('JefeFinal'));
       return;
     }
+    if (puerta.interior === 'cueva') {
+      // La cueva: otro nivel (Cueva.js); al terminarlo se vuelve por la otra boca.
+      // Si muere adentro, la cueva vuelve a empezar con los rehenes de antes.
+      this.registry.set('cuevaBase', { rehenes: this.registry.get('rehenes') });
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.launch('Cueva');
+        this.scene.sleep();
+      });
+      return;
+    }
     this.cameras.main.once('camerafadeoutcomplete', () => {
       const tomada = !!this.registry.get('interiores')[puerta.id];
       this.scene.launch('Interior', { tipo: puerta.interior, id: puerta.id, recompensaTomada: tomada });
@@ -405,15 +518,31 @@ class Nivel1 extends Phaser.Scene {
     });
   }
 
-  // Vuelve frente a la misma puerta, mirando hacia afuera.
+  // Vuelve frente a la misma puerta, mirando hacia afuera (de la cueva, por la
+  // boca del otro lado del peñón).
   volverDeInterior(datos) {
-    const p = this.puertaActual;
+    const p = datos && datos.cueva ? this.salidaCueva : this.puertaActual;
     if (datos && datos.recompensa) this.registry.set('interiores', { ...this.registry.get('interiores'), [datos.id]: true });
     const j = this.jugador;
     const x = (p.x0 + p.x1) / 2;
+    if (datos && datos.cueva) {
+      j.setFlipX(false);
+      // Sale de la cueva: polvo a sus pies.
+      const humo = this.add.particles(j.x, p.abajo - 10, 'fx_humo', {
+        speedX: { min: -90, max: 90 }, speedY: { min: -50, max: -10 }, lifespan: 800,
+        scale: { start: 2, end: 4.5 }, alpha: { start: 0.55, end: 0 }, tint: 0xb8a888, emitting: false
+      }).setDepth(11);
+      humo.explode(12);
+      this.time.delayedCall(900, () => humo.destroy());
+    }
     // reset() también actualiza la posición anterior del cuerpo: si solo se
     // moviera el cuerpo, el piso one-way de la choza no lo reconocería.
-    j.body.reset(x, j.y + (p.abajo - j.body.bottom)); // pies en el umbral
+    // Los pies van 30 px de arte bajo el centro del sprite (celda de 84x84).
+    // No se usa j.body.bottom: al despertar la escena todavía es el del cuadro
+    // en que se entró y podía dejarlo hundido en el piso (y se caía a través
+    // de la roca al volver de la cueva).
+    this.posturaJugador(false, false, false); // de pie: caja de colisión normal
+    j.body.reset(x, p.abajo - 30 * ESCALA); // pies en el umbral
     j.setVelocity(0).setFrame(0);
     this.input.keyboard.resetKeys();
     this.puertaDesde = this.game.loop.time + 500; // la tecla ARRIBA puede seguir apretada
@@ -422,7 +551,7 @@ class Nivel1 extends Phaser.Scene {
     j.body.setAllowGravity(true);
     this.estado = 'control';
     this.actualizarHUD();
-    this.cameras.main.fadeIn(300, 0, 0, 0);
+    this.cameras.main.fadeIn(datos && datos.cueva ? 400 : 300, 0, 0, 0);
   }
 
   // ---------------------------------------------------------------------------
@@ -486,8 +615,12 @@ class Nivel1 extends Phaser.Scene {
 
     this.cadaCelda('S', (col, fila) => {
       if (this.esLecho(col, fila)) return; // bajo el río: lo dibuja dibujarRio
+      // La entrada a la cueva: lo que tapa la colina y el hueco no
+      // se dibujan; abajo del hueco sigue el piso de tierra de afuera (no muro).
+      const enLista = (lista, c, f) => lista.some(([a, b]) => a === c && b === f);
+      if (enLista(ENTRADA_CUEVA.sinDibujo, col, fila) || enLista(ENTRADA_CUEVA.hueco, col, fila)) return;
       const arriba = this.celda(col, fila - 1);
-      const borde = !esPiedra(arriba);               // cara superior a la vista
+      const borde = !esPiedra(arriba) || enLista(ENTRADA_CUEVA.hueco, col, fila - 1); // cara superior a la vista
       const izq = !esPiedra(this.celda(col - 1, fila));
       const der = !esPiedra(this.celda(col + 1, fila));
       const frame = borde
@@ -499,7 +632,9 @@ class Nivel1 extends Phaser.Scene {
     this.crearPendientes();
 
     // Un cuerpo por tramo horizontal de piedra (menos cuerpos que uno por celda).
-    this.tramos('S', (col, fila) => this.esLecho(col, fila)).forEach(({ fila, desde, hasta }) => {
+    // Bajo el río no hay bloques; en el hueco de la cueva tampoco (manda el JSON de la entrada).
+    const hueco = (col, fila) => ENTRADA_CUEVA.hueco.some(([c, f]) => c === col && f === fila);
+    this.tramos('S', (col, fila) => this.esLecho(col, fila) || hueco(col, fila)).forEach(({ fila, desde, hasta }) => {
       const ancho = (hasta - desde + 1) * TILE;
       this.suelo.add(this.add.zone(desde * TILE + ancho / 2, fila * TILE + SUELO_Y + TILE / 2, ancho, TILE));
     });
@@ -735,14 +870,48 @@ class Nivel1 extends Phaser.Scene {
       });
   }
 
+  // Cajas de armas (W): se abren a balazos o tocándolas (Armas.js).
+  crearCajasArmas() {
+    const lugares = this.posiciones('W').sort((a, b) => a.x - b.x);
+    this.cajasArmas = lugares.map(({ x, abajo }, i) =>
+      crearCajaArmas(this, x, abajo + HUNDIDO, CAJAS_NIVEL1[i % CAJAS_NIVEL1.length]));
+    this.physics.add.overlap(this.balas, this.cajasArmas, (bala, caja) => {
+      if (this.impactoBala(bala)) return; // cohete o granada: explota (Jugador.js)
+      bala.destroy();
+      golpearCaja(this, caja); // con una explosión chica (Armas.js)
+    });
+  }
+
+  // Explosiones (cohete, granada), el escopetazo y el machete (cuerpo = true):
+  // las cholitas en el radio caen (quemadas si fue una explosión, con sangre si
+  // no) y las cajas se abren (Jugador.js: explotarProyectil, escopetazo, golpeCuerpo).
+  danoEnArea(x, y, radio, dano, cuerpo = false) {
+    this.cholitas.getChildren().forEach((c) => {
+      const estado = c.getData('estado');
+      if (estado !== 'ronda' && estado !== 'ataque') return;
+      if (Phaser.Math.Distance.Between(x, y, c.x, c.y - CHOLITA.alto * ESCALA / 2) > radio + 20) return;
+      if (cuerpo) sangrar(this, c.x, c.y - CHOLITA.alto * ESCALA / 2, c.x < x ? -1 : 1);
+      this.vencerCholita(c, x, !cuerpo);
+    });
+    this.soldadosEnArea(x, y, radio, cuerpo); // Soldados.js
+    this.cajasArmas.forEach((caja) => {
+      if (!caja.active || Phaser.Math.Distance.Between(x, y, caja.x, caja.y - 40) > radio + 30) return;
+      if (cuerpo) golpearCaja(this, caja);
+      else abrirCaja(this, caja);
+    });
+  }
+
   crearRecompensas() {
+    this.registry.set('vida', VIDA.mitades); // el nivel empieza con la vida llena (Jugador.js)
+    reiniciarArmas(this);                     // y solo con la pistola (Armas.js)
+    this.registry.set('cajas', {});           // cajas de armas abiertas en los interiores
     this.registry.set('rehenes', 0);
     this.registry.set('powerups', 0);
     // Cada interior trae una recompensa: rehén en la casa, power-up en la choza
     // (el edificio final no es un interior de Interior.js: no cuenta).
     this.registry.set('interiores', {});
     const recompensas = (tipo) => this.puertas.filter((p) => INTERIORES[p.interior] && INTERIORES[p.interior].recompensa.tipo === tipo).length;
-    this.totalRehenes = this.posiciones('H').length + recompensas('rehen');
+    this.totalRehenes = this.posiciones('H').length + recompensas('rehen') + CUEVA.rehenes.length; // + los de la cueva
     this.totalPowerups = this.posiciones('*').length + this.posiciones('N').length + recompensas('powerup');
 
     // Rehenes atados: caen hasta el suelo, la rama o la losa de abajo y
@@ -1042,6 +1211,11 @@ class Nivel1 extends Phaser.Scene {
 
     const largo = (this.anchoNivel - width) * rayos.x + width;
     for (let x = this.rnd.between(200, 500); x < largo; x += this.rnd.between(...rayos.separacion)) {
+      // Ninguno sobre la entrada de la cueva (con la cámara frente a ella): la lavaba.
+      if (this.bocaCuevaX !== undefined) {
+        const enPantalla = x - (this.bocaCuevaX - width / 2) * rayos.x;
+        if (enPantalla > width / 2 - 520 && enPantalla < width / 2 + 220) continue;
+      }
       const rayo = this.add.image(x, rayos.arriba, `rayo${this.rnd.between(0, rayos.variantes - 1)}`)
         .setOrigin(0).setScale(ESCALA).setScrollFactor(rayos.x, rayos.y)
         .setBlendMode(Phaser.BlendModes.ADD).setDepth(9).setAlpha(rayos.brillo[0]);
@@ -1062,6 +1236,494 @@ class Nivel1 extends Phaser.Scene {
     }
   }
 
+  // Entrada a la Cueva de los Guácharos en la cara izquierda del peñón
+  // (CUEVA_NIVEL1, ENTRADA_CUEVA; assets/cueva/, herramientas/entrada_cueva.py).
+  // Capas, de atrás para adelante:
+  //   árboles detrás (parallax 0.9) y la colina de arriba (mismo ancho que la cueva)
+  //   cueva_tunel   paredes, techo y piso de adentro,
+  //                 visto solo por la abertura (máscara cueva_hueco)
+  //   cueva_back    ladera, jamba y borde del piso (con el comienzo roto que
+  //                 se mezcla con la tierra), rocas sueltas de atrás
+  //   oscuridad     degradado sin bordes rectos, recortado a la abertura
+  //   jugador y enemigos (se oscurecen al avanzar: actualizarEntradaCueva)
+  //   cueva_front   el arco con los colmillos; lianas, rocas y pasto de adelante
+  // Se camina hacia adentro y en el fondo oscuro se pasa a la escena Cueva.
+  // Las capas siguen más allá del borde de la cámara: no se ve ningún corte.
+  crearCueva() {
+    texturasEfectos(this); // EfectosMenu.js: fx_humo, fx_chispa, fx_haz
+    texturasCueva(this);   // Cueva.js: animaciones de los guácharos, lianas, helecho
+    texturasEntradaCueva(this);
+    const { col, columnas } = CUEVA_NIVEL1;
+    const izquierda = col * TILE;
+    const derecha = (col + columnas) * TILE;
+    const abajo = this.sueloBajo(izquierda - TILE / 2, 0);
+    const C = ENTRADA_CUEVA;
+    const E = ESCALA;
+    const textura = (k) => this.textures.get('entrada_' + k).getSourceImage();
+    // Esquina de arriba a la izquierda de las capas de la cueva: la boca va
+    // sobre el borde del peñón y el piso sobre el suelo de afuera.
+    const arribaIzq = { x: izquierda - C.boca, y: abajo - C.piso };
+    const enMundo = (ax, ay) => ({ x: arribaIzq.x + ax, y: arribaIzq.y + ay });
+    const boca = enMundo(C.boca, C.piso);
+    this.colision = this.cache.json.get('entradaColision');
+    this.archivoColision = 'entrada_collision.json';
+    const fondo = { x: this.colision.walls[0].x, y: abajo };
+    this.entrada = { izquierda, abajo, boca: boca.x, fondo: fondo.x, tinte: false, murcielagos: false };
+    this.bocaCuevaX = boca.x + 60; // crearLuz y el primer plano no ponen nada delante
+    // Colisión de adentro (piso y pared del fondo): JSON editable con E.
+    this.crearColision();
+    // Referencia del parallax: la cámara centrada frente a la boca. Cada capa
+    // con parallax queda alineada ahí y se corre a su ritmo.
+    // (La cámara frente a la boca está en su tope derecho: el borde del peñón.)
+    const ref = derecha - this.scale.width;
+    const conParallax = (o, f, x) => o.setScrollFactor(f, 1).setX(x - ref * (1 - f));
+
+    // --- Colina de arriba: del mismo ancho que la cueva y en su misma x (la
+    // ladera sigue la de la cueva); su pie se funde sobre el borde de arriba.
+    // Detrás, árboles (parallax 0.9) con el tronco tapado por la colina. ---
+    const K = C.colina;
+    const colina = textura('cueva_colina');
+    const pieColina = arribaIzq.y + K.solape;
+    K.arboles.forEach(([dx, frame, escala], i) => {
+      conParallax(this.add.image(0, pieColina - colina.height + K.pieArboles, 'arbolesCerca', frame).setOrigin(0.5, 1)
+        .setScale(escala).setTint(0xa8a882).setFlipX(i % 2 === 1).setDepth(1.4), K.factor, arribaIzq.x + dx);
+    });
+    this.add.image(arribaIzq.x, pieColina, 'entrada_cueva_colina').setOrigin(0, 1).setDepth(11.05);
+    K.lianas.forEach(([dx, largo], i) => {
+      const liana = this.add.image(boca.x + dx, arribaIzq.y + 30, 'cueva_liana').setOrigin(0.5, 0)
+        .setScale(E * 0.8, E * largo).setTint(0x7a8a64).setDepth(11.07);
+      this.tweens.add({ targets: liana, angle: { from: -3, to: 3 }, duration: 2300 + i * 350, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    });
+
+    // --- La cueva ---
+    const hueco = this.make.image({ x: arribaIzq.x, y: arribaIzq.y, key: 'entrada_cueva_hueco', add: false }).setOrigin(0);
+    const mascara = hueco.createBitmapMask();
+    conParallax(this.add.image(0, arribaIzq.y, 'entrada_cueva_tunel').setOrigin(0).setDepth(1.46), C.tunel, arribaIzq.x)
+      .setMask(mascara);
+    this.add.image(arribaIzq.x, arribaIzq.y, 'entrada_cueva_back').setOrigin(0).setDepth(1.5);
+    // Oscuridad: degradado sin bordes (transparente en la boca, 90 % al fondo,
+    // difuminado arriba), solo dentro de la abertura. Debajo del jugador.
+    const alto = C.piso + 16;
+    const anchoOscuro = arribaIzq.x + textura('cueva_back').width - (boca.x - 10);
+    this.add.image(boca.x - 10, arribaIzq.y, 'cuevaOscuridad').setOrigin(0)
+      .setDisplaySize(anchoOscuro, alto).setDepth(1.7).setMask(mascara);
+    // Y el suelo de adentro (la tierra bajo las losas): oscuro arriba y se
+    // apaga hacia abajo, con el mismo degradado hacia el fondo.
+    this.add.image(boca.x - 10, abajo + 6, 'cuevaOscuridadSuelo').setOrigin(0)
+      .setDisplaySize(anchoOscuro, 90).setDepth(1.7);
+    this.add.image(arribaIzq.x, arribaIzq.y, 'entrada_cueva_front').setOrigin(0).setDepth(11);
+
+    // --- Suelo y borde: el pasto se va acabando hacia la boca ---
+    // Matas cada vez más chicas y separadas, piedritas y un helecho.
+    let x = arribaIzq.x - 80;
+    while (x < boca.x + 18) {
+      const t = Phaser.Math.Clamp((x - (arribaIzq.x - 80)) / (boca.x + 18 - (arribaIzq.x - 80)), 0, 1);
+      if (this.rnd.frac() > t * 0.7) {
+        const tex = this.rnd.frac() < 0.75 - t * 0.5 ? `mata${this.rnd.between(0, 2)}` : 'piedrasSueltas';
+        this.add.image(x, abajo + HUNDIDO, tex).setOrigin(0.5, 1).setScale(ESCALA * (1 - t * 0.55), ESCALA * (1 - t * 0.6))
+          .setFlipX(this.rnd.frac() < 0.5).setDepth(10.4);
+      }
+      x += 10 + t * 26 + this.rnd.between(0, 8);
+    }
+    this.add.ellipse(arribaIzq.x + C.boca / 2 + 10, abajo + 1, C.boca + 40, 10, 0x000000, 0.3).setDepth(1.51);
+    // Sobre el borde de la ladera: helechos y piedras (apoyados en su contorno).
+    C.ladera.forEach(([ax, tipo], i) => {
+      const y = this.contornoArriba('entrada_cueva_back', ax);
+      if (y === null) return;
+      const p = enMundo(ax, y + 3);
+      const img = tipo === 'helecho'
+        ? this.add.image(p.x, p.y, 'cueva_helecho').setScale(E * 0.7).setTint(0xb8b090)
+        : this.add.image(p.x, p.y, 'entrada_roca_3');
+      img.setOrigin(0.5, 1).setFlipX(i % 2 === 1).setDepth(1.52);
+    });
+    // Rocas sueltas en la boca: unas detrás, otras delante del jugador.
+    C.rocas.forEach(({ img, x: dx, delante }) => {
+      const rx = boca.x + dx;
+      const profundidad = delante ? 11.2 : 1.6;
+      // A tamaño de pantalla (como la cueva), un poco en la sombra de la boca.
+      const roca = this.add.image(rx, abajo + HUNDIDO, 'entrada_' + img).setOrigin(0.5, 1).setDepth(profundidad)
+        .setTint(delante ? 0xe8e0d0 : 0xb8ac98);
+      this.add.ellipse(rx, abajo - 1, roca.displayWidth * 0.95, 7, 0x000000, 0.4).setDepth(profundidad - 0.01);
+    });
+
+    // --- Luz y ambiente ---
+    // Rayo de luz diagonal suave que entra por la boca, con polvo flotando.
+    const rayo = this.add.image(boca.x - 60, abajo - 200, 'fx_haz').setOrigin(0, 0.5).setAngle(32).setScale(2.6, 1.8)
+      .setTint(0xfff2c8).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.12).setDepth(10.55);
+    this.tweens.add({ targets: rayo, alpha: 0.08, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.add.particles(0, 0, 'fx_chispa', {
+      emitZone: { type: 'random', source: new Phaser.Geom.Rectangle(boca.x - 10, abajo - 160, 190, 140) },
+      speedX: { min: -5, max: 8 }, speedY: { min: -6, max: 6 }, lifespan: { min: 3000, max: 5000 },
+      scale: { min: 0.6, max: 1 }, tint: 0xfff0c8, frequency: 240, blendMode: 'ADD',
+      alpha: { onEmit: () => 0, onUpdate: (p, k, t) => Math.sin(t * Math.PI) * 0.5 }
+    }).setDepth(10.56);
+    // Ojos rojos de guácharos en lo oscuro, al fondo.
+    for (let i = 0; i < 3; i++) {
+      const ox = fondo.x - this.rnd.between(20, 70);
+      const oy = abajo - this.rnd.between(50, 110);
+      const ojos = [-3, 3].map((d) => this.add.rectangle(ox + d, oy, E, E, 0xff3a1a).setDepth(1.75).setAlpha(0));
+      this.tweens.add({
+        targets: ojos, alpha: { from: 0, to: 0.9 }, duration: 160, yoyo: true, hold: this.rnd.between(500, 1400),
+        repeat: -1, repeatDelay: this.rnd.between(1500, 4000), delay: this.rnd.between(0, 3000)
+      });
+    }
+    // Vaho frío que sale de la boca, despacio.
+    this.add.particles(boca.x + 40, abajo - 50, 'fx_humo', {
+      x: { min: -30, max: 30 }, y: { min: -20, max: 20 }, speedX: { min: -24, max: -8 }, speedY: { min: -8, max: 2 },
+      lifespan: 2800, scale: { start: 1.2, end: 3.2 }, alpha: { start: 0.12, end: 0 }, tint: 0x9ab0a8, frequency: 300
+    }).setDepth(1.56);
+    // Gotas que caen de las estalactitas (con su salpicado y su sonido).
+    this.time.addEvent({ delay: 520, loop: true, callback: () => { if (Math.random() < 0.65) this.gotaCueva(); } });
+
+    this.efectosCueva(boca, fondo, abajo);
+
+    // Cada tanto sale una bandada chillando de la boca.
+    this.time.addEvent({ delay: 6500, loop: true, callback: () => this.bandadaCueva() });
+    this.crearSonidoCueva();
+
+    this.salidaCueva = { x0: derecha + 20, x1: derecha + 80, abajo: this.sueloBajo(derecha + TILE / 2, 0) };
+    // La cueva entra en el peñón: la cámara cambia de lado recién pasándolo.
+    this.penon = { izquierda: derecha, derecha, centro: derecha };
+  }
+
+  // y (en la textura) del primer píxel opaco de arriba en la columna x, o null.
+  contornoArriba(clave, x) {
+    const alto = this.textures.get(clave).getSourceImage().height;
+    for (let y = 0; y < alto; y++) {
+      if (this.textures.getPixelAlpha(x, y, clave) > 0) return y;
+    }
+    return null;
+  }
+
+  // Cuerpos de la entrada (assets/cueva/entrada_collision.json, px del mundo):
+  // el piso en pendiente (tiras de 4 px que siguen la línea) y la pared del
+  // fondo. Se rearman al salir del editor (tecla E).
+  crearColision() {
+    (this.cuerposEntrada || []).forEach((z) => z.destroy());
+    this.cuerposEntrada = [];
+    const d = this.colision;
+    const agregar = (zona) => { this.suelo.add(zona); this.cuerposEntrada.push(zona); };
+    d.ground.forEach((l) => {
+      const a = Math.min(l.x0, l.x1);
+      const b = Math.max(l.x0, l.x1);
+      for (let x = a; x < b; x += 4) {
+        const w = Math.min(4, b - x);
+        const t = l.x1 === l.x0 ? 0 : (x + w / 2 - l.x0) / (l.x1 - l.x0);
+        const y = l.y0 + (l.y1 - l.y0) * t;
+        agregar(this.add.zone(x + w / 2, y + 40, w, 80));
+      }
+    });
+    d.walls.forEach(({ x, y, w, h }) => agregar(this.add.zone(x + w / 2, y + h / 2, w, h)));
+    d.platforms.forEach(({ x0, x1, y }) => {
+      const z = this.add.zone((x0 + x1) / 2, y + 6, x1 - x0, 12);
+      this.agregarPasarela(z);
+      this.cuerposEntrada.push(z);
+    });
+  }
+
+  // y del piso de la entrada en x (la línea del JSON), o null fuera de ella.
+  pisoEntrada(x) {
+    if (!this.colision) return null;
+    let y = null;
+    this.colision.ground.forEach((l) => {
+      if (x < Math.min(l.x0, l.x1) || x > Math.max(l.x0, l.x1)) return;
+      const t = l.x1 === l.x0 ? 0 : (x - l.x0) / (l.x1 - l.x0);
+      const yl = l.y0 + (l.y1 - l.y0) * t;
+      if (y === null || yl < y) y = yl;
+    });
+    return y;
+  }
+
+  // Cada cuadro: el sonido según la distancia, el tinte de los que entran
+  // (se oscurecen según cuánto avanzan), los guácharos de la primera vez y el
+  // paso a la escena Cueva al llegar al fondo oscuro.
+  actualizarEntradaCueva(admin) {
+    const e = this.entrada;
+    if (!e) return;
+    const j = this.jugador;
+    // Solo en la entrada (del otro lado del peñón, donde se aparece al volver, no cuenta).
+    const adentro = (x) => x > e.boca && x < e.fondo + 40;
+    const avance = (x) => (adentro(x) ? Phaser.Math.Clamp((x - e.boca) / (e.fondo - e.boca), 0, 1) : 0);
+    const tinte = (t) => {
+      const c = Phaser.Display.Color.Interpolate.ColorWithColor(
+        Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(ENTRADA_CUEVA.tinte), 100, t * 100);
+      return Phaser.Display.Color.GetColor(c.r, c.g, c.b);
+    };
+    // El jugador (si no está parpadeando rojo por un golpe).
+    const tj = avance(j.body.center.x);
+    if (tj > 0 && this.estado !== 'interior') {
+      if (!j.isTinted || j.getData('tinteCueva') || j.tintTopLeft !== 0xff6060) {
+        j.setTint(tinte(tj));
+        j.setData('tinteCueva', true);
+      }
+    } else if (j.getData('tinteCueva')) {
+      j.clearTint();
+      j.setData('tinteCueva', false);
+    }
+    // Los enemigos también.
+    this.cholitas.getChildren().forEach((c) => {
+      const t = avance(c.x);
+      if (t > 0) { c.setTint(tinte(t)); c.setData('tinteCueva', true); } else if (c.getData('tinteCueva')) { c.clearTint(); c.setData('tinteCueva', false); }
+    });
+    this.actualizarSonidoCueva(j.x);
+    // La primera vez que se acerca: dos guácharos salen volando hacia la pantalla.
+    if (!e.murcielagos && Math.abs(j.x - e.boca) < 420) {
+      e.murcielagos = true;
+      this.guacharosHaciaLaPantalla();
+    }
+    // Bajando la pendiente: los pies pegados al piso (si no, quedan 2-3 px en
+    // el aire hasta que la gravedad lo baja).
+    const piso = this.pisoEntrada(j.body.center.x);
+    if (this.estado === 'control' && !admin && !this.trepando && piso !== null && j.body.velocity.y >= 0 &&
+        j.body.bottom < piso && piso - j.body.bottom < 6 && this.enSueloAntes) {
+      j.body.y += piso - j.body.bottom;
+    }
+    // Llegó al fondo oscuro: a la escena Cueva.
+    if (this.estado === 'control' && !admin && j.body.right > e.fondo - 26 && adentro(j.body.center.x)) this.entrarCueva();
+  }
+
+  // Fade a negro de 400 ms y la cueva como escena aparte (aparece desde la
+  // izquierda); este nivel se duerme y, al salir, se vuelve del otro lado del
+  // peñón con el mismo efecto al revés.
+  entrarCueva() {
+    this.estado = 'interior';
+    this.flechaPuerta.setVisible(false);
+    cerrarSelector(this, false);
+    this.registry.set('cuevaBase', { rehenes: this.registry.get('rehenes') });
+    this.jugador.setVelocity(0).anims.stop();
+    this.cameras.main.fadeOut(400, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.launch('Cueva');
+      this.scene.sleep();
+    });
+  }
+
+  // Una gota cae de una estalactita (de las del JSON) y salpica en el piso.
+  gotaCueva() {
+    const gotas = this.colision && this.colision.gotas;
+    if (!gotas || !gotas.length || this.estado === 'interior') return;
+    const [x, y] = Phaser.Utils.Array.GetRandom(gotas);
+    const piso = (this.pisoEntrada(x) ?? this.entrada.abajo) - 2;
+    const gota = this.add.image(x, y, 'gota').setScale(ESCALA).setDepth(10.56).setAlpha(0.9);
+    this.tweens.add({
+      targets: gota, y: piso, duration: Math.sqrt(2 * (piso - y) / 900) * 1000, ease: 'Quad.in',
+      onComplete: () => {
+        gota.destroy();
+        const salpica = this.add.particles(x, piso, 'gota', {
+          speed: { min: 40, max: 90 }, angle: { min: 200, max: 340 }, gravityY: 700, lifespan: 320,
+          scale: { start: ESCALA * 0.7, end: 0 }, emitting: false
+        }).setDepth(10.56);
+        salpica.explode(5);
+        this.time.delayedCall(400, () => salpica.destroy());
+        const onda = this.add.ellipse(x, piso + 1, 6, 2, 0x9ab8c8, 0.6).setDepth(10.56);
+        this.tweens.add({ targets: onda, scaleX: 3, alpha: 0, duration: 380, onComplete: () => onda.destroy() });
+        this.sonidoGota();
+      }
+    });
+  }
+
+  // Dos guácharos salen de la boca y vuelan hacia la pantalla (crecen).
+  guacharosHaciaLaPantalla() {
+    const e = this.entrada;
+    this.aviso(e.boca + 30, e.abajo - 150, '¡KRRAA!', 'rojo');
+    for (let i = 0; i < 2; i++) this.aveSaliendo(i * 250, i, true);
+  }
+
+  // Sonido de la cueva (Web Audio, sin archivos): un rumor grave con eco y el
+  // goteo (sonidoGota, que también suena con cada gota que cae). El volumen
+  // sube al acercarse a la boca (actualizarSonidoCueva).
+  crearSonidoCueva() {
+    const ctx = this.sound && this.sound.context;
+    if (!ctx || !ctx.createGain) return;
+    const master = ctx.createGain();
+    master.gain.value = 0;
+    master.connect(ctx.destination);
+    // Rumor: ruido marrón filtrado, en bucle.
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const datos = buffer.getChannelData(0);
+    let ultimo = 0;
+    for (let i = 0; i < datos.length; i++) {
+      ultimo = (ultimo + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      datos[i] = ultimo * 3.5;
+    }
+    const rumor = ctx.createBufferSource();
+    rumor.buffer = buffer;
+    rumor.loop = true;
+    const filtro = ctx.createBiquadFilter();
+    filtro.type = 'lowpass';
+    filtro.frequency.value = 380;
+    const volRumor = ctx.createGain();
+    volRumor.gain.value = 0.5;
+    rumor.connect(filtro).connect(volRumor).connect(master);
+    rumor.start();
+    // Eco (para las gotas).
+    const eco = ctx.createDelay(1);
+    eco.delayTime.value = 0.24;
+    const realimentacion = ctx.createGain();
+    realimentacion.gain.value = 0.45;
+    const ecoFiltro = ctx.createBiquadFilter();
+    ecoFiltro.type = 'lowpass';
+    ecoFiltro.frequency.value = 1800;
+    eco.connect(realimentacion).connect(eco);
+    eco.connect(ecoFiltro).connect(master);
+    this.sonidoCueva = { ctx, master, eco };
+    this.events.on('sleep', () => master.gain.setTargetAtTime(0, ctx.currentTime, 0.05));
+    this.events.once('shutdown', () => {
+      try { rumor.stop(); master.disconnect(); } catch (err) { /* ya estaba cortado */ }
+      this.sonidoCueva = null;
+    });
+  }
+
+  sonidoGota() {
+    const s = this.sonidoCueva;
+    if (!s || s.master.gain.value < 0.01) return;
+    const { ctx, master, eco } = s;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    const f = 900 + Math.random() * 1400;
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 0.45, t + 0.09);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    o.connect(g);
+    g.connect(master);
+    g.connect(eco);
+    o.start(t);
+    o.stop(t + 0.16);
+  }
+
+  actualizarSonidoCueva(x) {
+    const s = this.sonidoCueva;
+    if (!s) return;
+    const { alcance, volumen } = ENTRADA_CUEVA.sonido;
+    const d = Math.abs(x - (this.entrada.boca + this.entrada.fondo) / 2);
+    const v = Math.pow(Phaser.Math.Clamp(1 - d / alcance, 0, 1), 1.5) * volumen;
+    s.master.gain.setTargetAtTime(v, s.ctx.currentTime, 0.15);
+  }
+
+  // Editor de la colisión de la entrada (Cueva.js: tecla E). En Nivel1 la
+  // cámara deja de seguir al jugador mientras se edita y se mueve con las flechas.
+  alternarEditor() {
+    const entra = this.estado !== 'editor';
+    Cueva.prototype.alternarEditor.call(this);
+    const cam = this.cameras.main;
+    if (entra) cam.stopFollow();
+    else cam.startFollow(this.jugador, true, 0.1, 0.08).setFollowOffset(0, CAMARA.bajarJugador);
+  }
+
+  moverEditor() {
+    const cam = this.cameras.main;
+    const t = this.teclas;
+    const k = this.teclasExtra;
+    const dx = (t.right.isDown || k.D.isDown ? 12 : 0) - (t.left.isDown || k.A.isDown ? 12 : 0);
+    const dy = (t.down.isDown ? 12 : 0) - (t.up.isDown ? 12 : 0);
+    cam.setScroll(cam.scrollX + dx, cam.scrollY + dy);
+    this.dibujarEditor();
+  }
+
+  // Una bandada de guácharos sale de la cueva: arrancan en lo oscuro del
+  // fondo (detrás del negro, se ven apenas), cruzan el túnel por debajo del
+  // arco y recién afuera de la boca suben hacia el cielo, delante de todo.
+  // (Antes salían por arriba de la roca y atravesaban la ladera y la colina.)
+  bandadaCueva() {
+    const e = this.entrada;
+    if (!e || this.estado === 'interior') return;
+    const cam = this.cameras.main;
+    if (e.boca < cam.worldView.left - 200 || e.boca > cam.worldView.right + 200) return; // fuera de la pantalla, no
+    if (Math.abs(this.jugador.x - e.boca) < 600) {
+      this.aviso(e.boca + 30, e.abajo - 150, '¡KRRAA!', 'rojo');
+      this.cameras.main.shake(220, 0.002);
+    }
+    const n = this.rnd.between(3, 5);
+    for (let i = 0; i < n; i++) this.aveSaliendo(i * 160, i, false);
+  }
+
+  // Un guácharo que sale de la cueva (ver bandadaCueva). haciaPantalla: en
+  // vez de subir, crece como si viniera hacia la cámara (la primera vez).
+  aveSaliendo(espera, i, haciaPantalla) {
+    const e = this.entrada;
+    const escala = CUEVA.guacharo.escala * 0.8;
+    const y = e.abajo - this.rnd.between(70, 110);
+    const ave = this.add.sprite(e.fondo - 40, y, AVE.vuelo.clave, 2).setScale(escala * 0.6).setDepth(1.65)
+      .setFlipX(true).setTint(0x30303c).setAlpha(0);
+    ave.play({ key: 'ave_vuela', startFrame: i % 4 });
+    // 1. Por el túnel hacia la boca (sale de lo oscuro, se va aclarando).
+    this.tweens.add({
+      targets: ave, x: e.boca + 12, y: y + this.rnd.between(-8, 8), scale: escala, alpha: 1,
+      delay: espera, duration: 900, ease: 'Sine.in',
+      onUpdate: (tw) => ave.setTint(Phaser.Display.Color.GetColor(...[0x30, 0x30, 0x3c].map((v) => Math.round(v + (255 - v) * tw.progress ** 2)))),
+      onComplete: () => {
+        // 2. Afuera: delante de todo, sube (o viene hacia la pantalla).
+        ave.clearTint().setDepth(12);
+        const destino = haciaPantalla
+          ? { x: ave.x - 260 - i * 120, y: ave.y - 120 + i * 80, scale: 1.4 }
+          : { x: ave.x - this.rnd.between(420, 700), y: ave.y - this.rnd.between(260, 420), scale: escala };
+        this.tweens.add({
+          targets: ave, ...destino, duration: haciaPantalla ? 900 : this.rnd.between(2000, 2700), ease: 'Sine.in',
+          onComplete: () => this.tweens.add({ targets: ave, alpha: 0, duration: 200, onComplete: () => ave.destroy() })
+        });
+      }
+    });
+  }
+
+  // Efectos de la boca: niebla fría que se arrastra por el piso hacia afuera,
+  // luciérnagas en lo oscuro, piedritas y polvo que caen del arco y un
+  // parpadeo de la sombra (como si algo se moviera adentro).
+  efectosCueva(boca, fondo, abajo) {
+    texturasEfectos(this);
+    const ancho = fondo.x - boca.x;
+    // Niebla baja: sale del fondo y se derrama por la boca, a ras del piso.
+    this.add.particles(0, 0, 'fx_humo', {
+      emitZone: { type: 'random', source: new Phaser.Geom.Rectangle(boca.x + ancho * 0.3, abajo - 26, ancho * 0.6, 20) },
+      speedX: { min: -38, max: -16 }, speedY: { min: -4, max: 2 }, lifespan: { min: 3200, max: 4800 },
+      scale: { start: 2.2, end: 4.5 }, alpha: { start: 0.2, end: 0 }, tint: 0x8a9a98, frequency: 160
+    }).setDepth(10.45);
+    // Luciérnagas: puntitos verdes que flotan y titilan en lo oscuro.
+    this.add.particles(0, 0, 'fx_chispa', {
+      emitZone: { type: 'random', source: new Phaser.Geom.Rectangle(boca.x + 40, abajo - 150, ancho - 60, 120) },
+      speedX: { min: -10, max: 10 }, speedY: { min: -8, max: 8 }, lifespan: { min: 2500, max: 4500 },
+      scale: { min: 0.6, max: 1.1 }, tint: 0xb8ff70, frequency: 420, blendMode: 'ADD',
+      alpha: { onEmit: () => 0, onUpdate: (p, k, t) => Math.max(0, Math.sin(t * Math.PI * 3)) * 0.9 }
+    }).setDepth(1.75);
+    // Piedritas y polvo que caen del arco de vez en cuando.
+    this.time.addEvent({
+      delay: 2300, loop: true, callback: () => {
+        if (this.estado === 'interior' || Math.random() < 0.4) return;
+        const x = boca.x + this.rnd.between(-10, 140);
+        const y0 = abajo - 190;
+        const polvo = this.add.particles(x, y0, 'fx_humo', {
+          speedX: { min: -8, max: 8 }, speedY: { min: 30, max: 70 }, lifespan: 1200,
+          scale: { start: 0.5, end: 1.6 }, alpha: { start: 0.35, end: 0 }, tint: 0xa89070, emitting: false
+        }).setDepth(11.1);
+        polvo.explode(6);
+        this.time.delayedCall(1300, () => polvo.destroy());
+        const piedra = this.add.rectangle(x, y0, 3, 3, 0x6a5a40).setDepth(11.1);
+        this.tweens.add({
+          targets: piedra, y: abajo - 2, angle: 180, duration: 650, ease: 'Quad.in',
+          onComplete: () => { chispas(this, x, abajo - 2, 2, -90, 120, 11.1); piedra.destroy(); }
+        });
+      }
+    });
+    // La sombra de adentro "respira" (algo se mueve en el fondo).
+    const sombra = this.add.ellipse(fondo.x - 60, abajo - 80, 160, 140, 0x000000, 0).setDepth(1.72);
+    this.tweens.add({ targets: sombra, fillAlpha: 0.35, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+  }
+
+  // La cámara se queda de un lado del peñón: hasta su borde derecho (antes de
+  // la cueva) o desde su borde izquierdo (después).
+  limitarCamaraPenon() {
+    const p = this.penon;
+    const lado = this.jugador.x < p.centro ? 0 : 1;
+    if (lado === this.ladoPenon) return;
+    this.ladoPenon = lado;
+    const cam = this.cameras.main;
+    if (lado === 0) cam.setBounds(0, 0, p.derecha, this.altoNivel);
+    else cam.setBounds(p.izquierda, 0, this.anchoNivel - p.izquierda, this.altoNivel);
+  }
+
   // Copias lejanas de los props: más chicas, con neblina y sin colisión.
   crearPropsFondo() {
     const F = PROPS_FONDO;
@@ -1069,22 +1731,73 @@ class Nivel1 extends Phaser.Scene {
       this.add.image(x, F.base, prop, '__BASE').setOrigin(0.5, 1).setScale(ESCALA * F.escala)
         .setScrollFactor(F.x, F.y).setAlpha(F.alfa).setTint(F.tinte).setFlipX(i % 2 === 1);
     });
+    this.crearFogatas();
   }
 
-  // Primer plano: helechos y pasto alto abajo, lianas arriba, oscurecidos y a
-  // x3 (están más cerca de la cámara). Pasan por delante del jugador.
+  // Fogatas de fondo (FOGATAS_FONDO): sin cuerpo, a la escala y con la
+  // neblina de la capa; el fuego sin neblina (brilla) y con un resplandor.
+  crearFogatas() {
+    const F = PROPS_FONDO;
+    const s = ESCALA * F.escala;
+    const anim = (key, textura, frames, frameRate, repeat = -1) => {
+      if (!this.anims.exists(key)) this.anims.create({ key, frames: this.anims.generateFrameNumbers(textura, { frames }), frameRate, repeat });
+    };
+    anim('fogata_normal', 'fogata', [0, 1, 2, 3], 8);
+    anim('fogata_calienta', 'fogata', [4, 5, 6, 7], 10);
+    anim('fogata_fuerte', 'fogata', [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 8, 9, 10, 11, 7, 6, 5, 4], 10, 0);
+    anim('fogata_humo', 'fogataHumo', [0, 1, 2, 3, 4, 5, 6, 7], 8);
+    anim('rebelde_sopla', 'rebeldes', [0, 0, 1, 2, 3, 3, 3, 2, 1], 6, 1);
+    anim('rebelde_atiza', 'rebeldes', [4, 5], 3);
+    const capa = (o) => o.setScrollFactor(F.x, F.y).setScale(s);
+
+    FOGATAS_FONDO.lista.forEach((x, i) => {
+      const brillo = this.add.ellipse(x, F.base - 6 * s, 90 * s, 34 * s, FOGATAS_FONDO.brillo, 0.22)
+        .setScrollFactor(F.x, F.y).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: brillo, alpha: 0.1, duration: 400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      const humo = capa(this.add.sprite(x + 2 * s, F.base - 26 * s, 'fogataHumo', 0).setOrigin(0.5, 1)).setAlpha(0.55).setTint(F.tinte);
+      humo.play({ key: 'fogata_humo', startFrame: i * 3 });
+      const fuego = capa(this.add.sprite(x, F.base, 'fogata', 0).setOrigin(0.5, 1)).play('fogata_normal');
+      // Uno atiza a la izquierda (mirando al fuego) y el otro sopla a la derecha.
+      capa(this.add.sprite(x - 38 * s, F.base, 'rebeldes', 4).setOrigin(0.5, 1).setFlipX(true))
+        .setAlpha(F.alfa).setTint(F.tinte).play({ key: 'rebelde_atiza', startFrame: i });
+      const sopla = capa(this.add.sprite(x + 40 * s, F.base, 'rebeldes', 0).setOrigin(0.5, 1)).setAlpha(F.alfa).setTint(F.tinte);
+
+      // Sopla (el fuego se calienta), el fuego llega a full (se aparta mirando) y vuelve.
+      const ciclo = () => {
+        sopla.play('rebelde_sopla');
+        fuego.play('fogata_calienta');
+        sopla.once('animationcomplete', () => {
+          sopla.setFrame(6);
+          fuego.play('fogata_fuerte');
+          this.tweens.add({ targets: brillo, scale: 1.5, duration: 300, yoyo: true, hold: 900 });
+          fuego.once('animationcomplete', () => {
+            fuego.play('fogata_normal');
+            sopla.setFrame(0);
+          });
+        });
+      };
+      this.time.addEvent({ delay: FOGATAS_FONDO.ciclo, startAt: i * 2500, loop: true, callback: ciclo });
+    });
+  }
+
+  // Primer plano: lianas y musgo colgando arriba, oscurecidos y a x3 (están
+  // más cerca de la cámara), y troncos gigantes en silueta. Pasan por delante
+  // del jugador. Abajo no va nada: esta capa sigue a la pantalla y no al
+  // terreno, así que el pasto quedaba flotando sobre la piedra o el río.
   crearPrimerPlano() {
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     const largo = (this.anchoNivel - width) * CAPAS.frente.x + width;
     const agregar = (x, y, frame, origenY) => this.add.image(x, y, 'tilesSelva', frame)
       .setOrigin(0.5, origenY).setScale(ESCALA * 1.5).setTint(0x8a8460)
       .setScrollFactor(CAPAS.frente.x, CAPAS.frente.y).setDepth(15).setFlipX(this.rnd.frac() < 0.5);
 
-    for (let x = 600; x < largo; x += this.rnd.between(500, 900)) {
-      agregar(x, height + 10, this.rnd.pick([T.helecho, T.pasto]), 1);
-    }
     // Troncos gigantes casi en silueta que cruzan toda la pantalla.
     for (let x = 1400; x < largo; x += this.rnd.between(...CAPAS.frente.troncos)) {
+      // Ninguno delante de la boca de la cueva (con la cámara frente a ella).
+      if (this.bocaCuevaX !== undefined) {
+        const enPantalla = x - (this.bocaCuevaX - width / 2) * CAPAS.frente.x;
+        if (enPantalla > width / 2 - 420 && enPantalla < width / 2 + 320) continue;
+      }
       this.add.image(x, -200, 'gigantesFrente', this.rnd.between(0, 2))
         .setOrigin(0.5, 0).setScale(ESCALA).setScrollFactor(CAPAS.frente.x, CAPAS.frente.y)
         .setDepth(15).setFlipX(this.rnd.frac() < 0.5);
@@ -1114,7 +1827,7 @@ class Nivel1 extends Phaser.Scene {
     // Empieza fuera de la pantalla, a la izquierda, con los pies a la altura
     // del suelo de J (en el cuadro de 84x84 los pies están 30 px bajo el centro).
     this.jugador = this.physics.add.sprite(-80, inicio.abajo - 30 * ESCALA, textura, 0).setScale(ESCALA).setDepth(10);
-    this.jugador.body.setSize(20, 56).setOffset(28, 16);
+    fisicaJugador(this.jugador); // Jugador.js: cuerpo, gravedad y caída
     this.jugador.body.setAllowGravity(false); // fuera del nivel no hay piso
     this.sombraJugador = this.crearSombra(SOMBRA.jugador, 9.4);
 
@@ -1136,7 +1849,11 @@ class Nivel1 extends Phaser.Scene {
     this.estabaEnAgua = false;
     this.trepando = null;
     this.enSueloAntes = false;
-    this.crearBalas([this.suelo, this.obstaculos]);
+    // Las balas no chocan con el terreno ni con las barricadas: sus cuerpos son
+    // cajas invisibles más grandes que el dibujo (escalones, rampas) y las
+    // frenaban en el aire. Solo les pegan a los enemigos o llegan a su alcance.
+    // Las granadas y los cohetes sí explotan contra el suelo y las barricadas.
+    this.crearBalas([], [this.suelo, this.obstaculos]);
     this.xAnterior = this.jugador.body.x;
     this.estado = 'entrada';
 
@@ -1150,23 +1867,8 @@ class Nivel1 extends Phaser.Scene {
     const { width } = this.scale;
     this.jugador.setVelocityX(JUGADOR.velocidad * 0.8).play('jugador_caminar');
 
-    const estilo = (tamano, color) => ({
-      fontFamily: FUENTE_TITULO, fontSize: tamano, color, stroke: '#2a1a05', strokeThickness: 8,
-      shadow: { offsetX: 4, offsetY: 4, color: '#000000', fill: true, stroke: true }
-    });
-    const mision = this.add.text(width / 2, 170, 'MISIÓN 1', estilo('64px', '#ffd23f'))
-      .setOrigin(0.5).setScrollFactor(0).setDepth(20).setScale(3).setAlpha(0);
-    const adelante = this.add.text(width / 2, 240, '¡ADELANTE!', estilo('40px', '#ff7a2a'))
-      .setOrigin(0.5).setScrollFactor(0).setDepth(20).setAlpha(0);
-
-    this.tweens.chain({
-      tweens: [
-        { targets: mision, scale: 1, alpha: 1, duration: 350, ease: 'Back.out', delay: 300 },
-        { targets: adelante, alpha: 1, y: 230, duration: 250 },
-        { targets: [mision, adelante], alpha: 0, duration: 400, delay: 1300 }
-      ],
-      onComplete: () => { mision.destroy(); adelante.destroy(); }
-    });
+    // MISIÓN 1 letra por letra y ¡COMIENZA! (Estado.js); al reaparecer, no.
+    if (!this.reapareciendo) comienzaMision(this, 'MISIÓN 1');
   }
 
   terminarEntrada() {
@@ -1185,13 +1887,17 @@ class Nivel1 extends Phaser.Scene {
 
   moverJugador() {
     const j = this.jugador;
-    const izquierda = this.teclas.left.isDown || this.teclasExtra.A.isDown;
-    const derecha = this.teclas.right.isDown || this.teclasExtra.D.isDown;
-    const arriba = this.teclas.up.isDown || this.teclasExtra.W.isDown;
-    const abajo = this.teclas.down.isDown || this.teclasExtra.S.isDown;
-    const espacio = this.teclasExtra.SPACE.isDown;
-    const corre = this.teclas.shift.isDown;
-    const dispara = this.teclasExtra.J.isDown || this.teclasExtra.X.isDown;
+    // Aturdido (Jugador.js): ESPACIO lo libera y las demás teclas no cuentan.
+    // Con TAB apretado, el selector de armas (Armas.js): tampoco se mueve.
+    const aturdido = this.seguirAturdido(Phaser.Input.Keyboard.JustDown(this.teclasExtra.SPACE));
+    const libre = !aturdido && !seguirSelector(this, this.teclasExtra.TAB.isDown && !this.aturdido);
+    const izquierda = libre && (this.teclas.left.isDown || this.teclasExtra.A.isDown);
+    const derecha = libre && (this.teclas.right.isDown || this.teclasExtra.D.isDown);
+    const arriba = libre && (this.teclas.up.isDown || this.teclasExtra.W.isDown);
+    const abajo = libre && (this.teclas.down.isDown || this.teclasExtra.S.isDown);
+    const espacio = libre && this.teclasExtra.SPACE.isDown;
+    const corre = libre && this.teclas.shift.isDown;
+    const dispara = libre && (this.teclasExtra.J.isDown || this.teclasExtra.X.isDown);
 
     // Puertas: con el jugador delante aparece la flecha y ARRIBA entra.
     const puerta = !this.trepando && this.puertaEn(j);
@@ -1216,21 +1922,25 @@ class Nivel1 extends Phaser.Scene {
       this.empezarATrepar(escalera);
       return;
     }
-    // Fuera de una escalera y de una puerta, ARRIBA también salta (como antes).
-    const saltar = espacio || (arriba && !escalera && !puerta);
-
     // Rampas: se resuelven después del paso de física de este cuadro.
     const rampaAntes = this.rampaActual;
     if (rampaAntes) this.frenarContraMuro(j, this.xAnterior);
     this.rampaActual = this.pegarARampa(j, this.enSueloAntes || !!rampaAntes);
     if (rampaAntes && !this.rampaActual) this.asentarEnPiedra(j);
     const enSuelo = j.body.blocked.down || j.body.touching.down || !!this.rampaActual;
+
     const sobrePasarela = this.time.now - this.sobrePasarelaEn < 100;
+
+    // ABAJO agacha (sobre una losa o rama, en cambio, baja de ella); ARRIBA
+    // mira y apunta hacia arriba (Jugador.js). Si el personaje no tiene esos
+    // cuadros, fuera de una escalera y de una puerta, ARRIBA salta.
+    const apunta = this.posturaJugador(enSuelo && !sobrePasarela, arriba, abajo);
+    const saltar = espacio || (arriba && !apunta && !escalera && !puerta);
     const rio = this.rioEn(j);
 
     // Velocidad: más lenta en el agua; en rampas 85% de subida y 110% de bajada.
     const direccion = izquierda ? -1 : derecha ? 1 : 0;
-    let velocidad = JUGADOR.velocidad * (rio ? RIO.lentitud : 1) * (corre ? JUGADOR.corrida : 1);
+    let velocidad = JUGADOR.velocidad * (rio ? RIO.lentitud : 1) * (this.agachado ? JUGADOR.agachado : corre ? JUGADOR.corrida : 1);
     if (this.rampaActual && this.rampaActual.sube && direccion) {
       velocidad *= direccion === this.rampaActual.sube ? RAMPA_VELOCIDAD.subida : RAMPA_VELOCIDAD.bajada;
     }
@@ -1238,8 +1948,9 @@ class Nivel1 extends Phaser.Scene {
     if (this.time.now > this.golpeHasta) j.setVelocityX(direccion * velocidad);
     if (direccion) j.setFlipX(direccion < 0);
 
-    // ↓ + salto sobre una losa o rama: se deja caer a través. Si no, salta.
-    if (saltar && abajo && sobrePasarela) {
+    // ABAJO sobre una losa o rama (pisos de casas, ramas, puentes): se deja
+    // caer a través. Si no, salta.
+    if (abajo && sobrePasarela) {
       this.bajandoHasta = this.time.now + 250;
     } else if (saltar && enSuelo && !this.saltoPresionado) {
       j.setVelocityY(-JUGADOR.salto * (rio ? RIO.salto : 1));
@@ -1343,7 +2054,7 @@ class Nivel1 extends Phaser.Scene {
       });
       (datos.solidos || []).forEach(([x0, x1, y]) => {
         const [a, b] = rango(x0, x1);
-        this.obstaculos.add(this.add.zone((a + b) / 2, (py(y) + base) / 2, b - a, base - py(y)));
+        this.agregarPasarela(this.add.zone((a + b) / 2, py(y) + 3, b - a, 6));
       });
       (datos.escaleras || []).forEach(([x0, x1, y]) => {
         const [a, b] = rango(x0, x1);
@@ -1368,11 +2079,11 @@ class Nivel1 extends Phaser.Scene {
   // Enemigo provisional en las torres: el soldado teñido, quieto y mirando
   // hacia la entrada, con su sombra. En el suelo patrullan las cholitas.
   crearEnemigos() {
-    this.puestosEnemigo.forEach(({ x, y, mira }) => {
-      this.sombraBase(x, y + 1, SOMBRA.jugador, 9.3, SOMBRA.alto);
-      this.add.sprite(x, y - 30 * ESCALA, 'jugador', 0).setScale(ESCALA)
-        .setFlipX(mira < 0).setTint(0xb07850).setDepth(9.5);
-    });
+    // Soldados (Soldados.js): los de las marcas E patrullan; los de las torres vigilan.
+    this.crearSoldados([
+      ...this.posiciones('E').map(({ x, abajo }) => ({ x, abajo })),
+      ...this.puestosEnemigo.map(({ x, y }) => ({ x, abajo: y, torre: true }))
+    ]);
     this.crearCholitas();
   }
 
@@ -1403,6 +2114,12 @@ class Nivel1 extends Phaser.Scene {
         frames: this.anims.generateFrameNumbers('cholitaRip', { start: rip, end: rip + CHOLITA.rip.cuadros - 1 }),
         frameRate: 9
       });
+      const quemada = fila * CHOLITA.quemada.cuadros;
+      this.anims.create({
+        key: `cholita_quemada_${pollera}`,
+        frames: this.anims.generateFrameNumbers('cholitaQuemada', { frames: CHOLITA.quemada.secuencia.map((k) => quemada + k) }),
+        frameRate: 8
+      });
     });
 
     this.cholitas = this.physics.add.group({ allowGravity: true });
@@ -1428,9 +2145,12 @@ class Nivel1 extends Phaser.Scene {
     this.physics.add.overlap(this.balas, this.cholitas, (bala, c) => {
       const estado = c.getData('estado');
       if (estado !== 'ronda' && estado !== 'ataque') return;
-      chispas(this, bala.x, bala.y, 8, bala.flipX ? 0 : 180, 120, 10.3);
+      if (this.impactoBala(bala)) return; // cohete o granada: explota en área (Jugador.js)
+      // La llamarada del lanzallamas la prende fuego; las balas, sangre.
+      const fuego = bala.getData('tipo') === 'llama';
+      if (!fuego) sangrar(this, bala.x, bala.y, bala.body.velocity.x < 0 ? -1 : 1); // Efectos.js
       bala.destroy();
-      this.vencerCholita(c, bala.x);
+      this.vencerCholita(c, bala.x, fuego);
     });
   }
 
@@ -1539,15 +2259,27 @@ class Nivel1 extends Phaser.Scene {
   // Fuera de combate: el golpe la tira para atrás (cholita_rip: pierde el
   // sombrero, cae sentada y queda tendida), y después se desvanece. Los
   // cuadros miran a la derecha y cae hacia atrás: mira hacia quien le pegó.
-  vencerCholita(c, desdeX = this.jugador.x) {
+  // fuego: por el lanzallamas, una granada o un cohete se prende fuego, corre
+  // gritando y queda hecha ceniza; si no, cae con sangre.
+  vencerCholita(c, desdeX = this.jugador.x, fuego = false) {
     c.setData('estado', 'vencida');
+    sumarPuntos(this, 100);
     c.body.enable = false;
     c.anims.timeScale = 1;
-    c.setFlipX(desdeX < c.x);
-    this.aviso(c.x, c.y - CHOLITA.alto * ESCALA, '¡AYAYAY!', '#ff7a2a');
-    c.play(`cholita_rip_${c.getData('pollera')}`);
-    // Al caer se corre un poco para atrás.
-    this.tweens.add({ targets: c, x: c.x + (desdeX < c.x ? 30 : -30), duration: 450, ease: 'Quad.out' });
+    this.aviso(c.x, c.y - CHOLITA.alto * ESCALA, '¡AYAYAY!', 'rojo');
+    const lejos = desdeX < c.x ? 1 : -1; // hacia el lado contrario al golpe
+    if (fuego) {
+      // Corre para el otro lado mientras se quema (los cuadros miran a la derecha).
+      c.setFlipX(lejos < 0);
+      c.play(`cholita_quemada_${c.getData('pollera')}`);
+      this.tweens.add({ targets: c, x: c.x + lejos * CHOLITA.quemada.corre, duration: 1100, ease: 'Sine.out' });
+    } else {
+      c.setFlipX(desdeX < c.x);
+      c.play(`cholita_rip_${c.getData('pollera')}`);
+      estallidoSangre(this, c.x, c.y - CHOLITA.alto * ESCALA * 0.45); // Efectos.js
+      // Al caer se corre un poco para atrás.
+      this.tweens.add({ targets: c, x: c.x + lejos * 30, duration: 450, ease: 'Quad.out' });
+    }
     c.once('animationcomplete', () => {
       this.tweens.add({ targets: [c, c.getData('sombra')], alpha: 0, delay: 1400, duration: 500, onComplete: () => c.destroy() });
     });
@@ -1563,9 +2295,12 @@ class Nivel1 extends Phaser.Scene {
     const j = this.jugador;
     this.trepando = escalera;
     this.rampaActual = null;
+    this.posturaJugador(false, false, false); // se levanta para trepar
     j.body.setAllowGravity(false);
     j.body.x += escalera.centro - j.body.center.x; // se centra en la escalera
     j.setVelocity(0);
+    j.anims.stop();
+    if (this.cuadrosJugador.trepar) j.setFrame(this.cuadrosJugador.trepar[0]);
   }
 
   // Sube o baja; al llegar arriba queda parado en el piso, al llegar abajo
@@ -1596,13 +2331,15 @@ class Nivel1 extends Phaser.Scene {
     }
     this.saltoPresionado = espacio;
 
-    // Sin cuadros de trepar todavía: el paso de caminar, más lento, al moverse.
+    // Sin cuadros de trepar: el paso de caminar, más lento, al moverse.
     if (this.trepando && (arriba || abajo)) {
-      j.anims.play('jugador_caminar', true);
-      j.anims.timeScale = 0.6;
+      const propios = !!this.cuadrosJugador.trepar;
+      j.anims.play(propios ? 'jugador_trepar' : 'jugador_caminar', true);
+      j.anims.timeScale = propios ? 1 : 0.6;
     } else {
       j.anims.stop();
     }
+    this.mostrarArmaLarga(); // Jugador.js: trepando no se ve
     this.xAnterior = j.body.x;
   }
 
@@ -1622,7 +2359,9 @@ class Nivel1 extends Phaser.Scene {
 
   // Primer apoyo debajo de los pies: suelo del mapa, pasarela u obstáculo.
   apoyoDebajo(x, pies) {
-    let y = this.sueloBajo(x, pies - 10);
+    // Adentro de la cueva el piso es la pendiente del JSON (no el mapa).
+    const enCueva = this.pisoEntrada ? this.pisoEntrada(x) : null;
+    let y = enCueva !== null ? enCueva : this.sueloBajo(x, pies - 10);
     const mirar = (grupo) => grupo.getChildren().forEach((zona) => {
       const b = zona.body;
       if (x >= b.left && x <= b.right && b.top >= pies - 10 && b.top < y) y = b.top;
@@ -1649,9 +2388,12 @@ class Nivel1 extends Phaser.Scene {
     sombra.setVisible(true).setPosition(x, suelo - 1).setScale(f).setAlpha(f);
   }
 
-  // Piedritas y pasto tapando la base de las patas de un prop.
+  // Piedritas y pasto tapando la base de las patas de un prop. Solo donde el
+  // suelo está a la altura de la base: un prop puede quedar en parte sobre
+  // una rampa o un borde, y ahí el pasto quedaría en el aire.
   taparBase(izquierda, base, ancho) {
     for (let x = izquierda + 6; x < izquierda + ancho - 6; x += this.rnd.between(14, 30)) {
+      if (Math.abs(this.sueloBajo(x, base - 20) - base) > 6) continue;
       const textura = this.rnd.frac() < 0.6 ? `mata${this.rnd.between(0, 2)}` : 'piedrasSueltas';
       this.add.image(x, base + 4, textura).setOrigin(0.5, 1).setScale(ESCALA).setDepth(2.5).setFlipX(this.rnd.frac() < 0.5);
     }
@@ -1662,9 +2404,11 @@ class Nivel1 extends Phaser.Scene {
   // delante de la piedra y de los pilotes, detrás de props y jugador.
   crearCaminoTierra() {
     texturaCaminoTierra(this, 'caminoTierra', 'camino');
+    // El hueco de la cueva cuenta como aire: la tierra sigue por debajo de ella.
+    const hueco = (col, fila) => ENTRADA_CUEVA.hueco.some(([c, f]) => c === col && f === fila);
     const esSuelo = (col, fila) => {
-      const arriba = this.celda(col, fila - 1);
-      return this.celda(col, fila) === 'S' && !this.esLecho(col, fila) && arriba !== 'S' && arriba !== 'A' && !RAMPAS[arriba];
+      const arriba = hueco(col, fila - 1) ? '.' : this.celda(col, fila - 1);
+      return this.celda(col, fila) === 'S' && !hueco(col, fila) && !this.esLecho(col, fila) && arriba !== 'S' && arriba !== 'A' && !RAMPAS[arriba];
     };
     for (let fila = 0; fila < this.filas; fila++) {
       for (let col = 0; col < this.columnas; col++) {
@@ -1703,9 +2447,8 @@ class Nivel1 extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   crearHUD() {
-    this.hud = this.add.text(16, 14, '', {
-      fontFamily: FUENTE_PIXEL, fontSize: '12px', color: '#ffd23f', stroke: '#000000', strokeThickness: 4
-    }).setScrollFactor(0).setDepth(20);
+    // Arriba de todo: la barra de vida (Jugador.js) empieza en y 36.
+    this.hud = TextFX.hud(this, 16, 8, '', { color: 'oro', origen: 0 }).setDepth(20);
     this.actualizarHUD();
   }
 
@@ -1714,11 +2457,9 @@ class Nivel1 extends Phaser.Scene {
       `POWER-UP ${this.registry.get('powerups')}/${this.totalPowerups}`);
   }
 
-  aviso(x, y, texto, color = '#ffffff') {
-    const t = this.add.text(x, y, texto, {
-      fontFamily: FUENTE_PIXEL, fontSize: '12px', color, stroke: '#000000', strokeThickness: 4
-    }).setOrigin(0.5).setDepth(20);
-    this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 1200, onComplete: () => t.destroy() });
+  // color: 'oro', 'plata' o 'rojo' (TextFX).
+  aviso(x, y, texto, color = 'plata') {
+    TextFX.popup(this, x, y, texto, { color }).setDepth(20);
   }
 
   crearAnimacionesNpc() {
@@ -1738,7 +2479,8 @@ class Nivel1 extends Phaser.Scene {
     rehen.setData('estado', 'libre');
     this.registry.inc('rehenes');
     this.actualizarHUD();
-    this.aviso(rehen.x, rehen.y - NPC.alto * ESCALA, '¡GRACIAS!', '#ffd23f');
+    rescateHUD(this); // Estado.js: ¡REHÉN RESCATADO! (y puntos)
+    this.aviso(rehen.x, rehen.y - NPC.alto * ESCALA, '¡GRACIAS!', 'oro');
     rehen.play('npc_libre');
     rehen.once('animationcomplete', () => {
       this.time.delayedCall(NPC.saludo, () => {
@@ -1829,7 +2571,7 @@ class Nivel1 extends Phaser.Scene {
   }
 
   // Al tocarlo: entrega la hamburguesa (suma un power-up), festeja con un
-  // salto, hace la venia y se va corriendo.
+  // salto, hace la venia y desaparece (puf: humo y destello).
   recibirHamburguesa(npc) {
     if (npc.getData('estado') !== 'espera') return;
     npc.setData('estado', 'entrega');
@@ -1840,8 +2582,11 @@ class Nivel1 extends Phaser.Scene {
     this.time.delayedCall(450, () => {
       if (!npc.active) return;
       this.registry.inc('powerups');
+      this.registry.inc('powerupsTotal');
+      sumarPuntos(this, PARTIDA.puntosPowerup);
       this.actualizarHUD();
-      this.aviso(npc.x, npc.y - NPC_POWER.alto * ESCALA, '¡HAMBURGUESA!', '#ffb030');
+      this.curarJugador(VIDA.hamburguesa); // media barra de vida (Jugador.js)
+      this.aviso(npc.x, npc.y - NPC_POWER.alto * ESCALA, '¡HAMBURGUESA! +MEDIA VIDA', 'oro');
       this.cameras.main.flash(120, 255, 200, 120);
     });
     npc.once('animationcomplete', () => {
@@ -1855,17 +2600,37 @@ class Nivel1 extends Phaser.Scene {
         npc.play('power_venia');
         npc.once('animationcomplete', () => {
           if (!npc.active) return;
-          npc.setFlipX(false).play('power_corre');
-          npc.setData({ estado: 'sale', desde: this.time.now, xAnterior: npc.body.x, rampa: null });
+          this.desaparecerNpc(npc);
         });
       });
     });
   }
 
+  // Puf: nube de humo, destello y se achica hasta desaparecer.
+  desaparecerNpc(npc) {
+    npc.setData('estado', 'desaparece');
+    npc.body.enable = false;
+    const x = npc.x;
+    const y = npc.y - NPC_POWER.alto * ESCALA * 0.45;
+    const humo = this.add.particles(x, y, 'fx_humo', {
+      speed: { min: 30, max: 110 }, lifespan: 650, scale: { start: 2.5, end: 5 },
+      alpha: { start: 0.7, end: 0 }, tint: 0xe8e4d8, emitting: false
+    }).setDepth(9.6);
+    humo.explode(14);
+    this.time.delayedCall(700, () => humo.destroy());
+    chispas(this, x, y, 12, -90, 360, 9.7);
+    this.tweens.add({
+      targets: npc, scaleX: 0, scaleY: ESCALA * 1.3, alpha: 0, duration: 220, ease: 'Back.in',
+      onComplete: () => npc.destroy()
+    });
+  }
+
   recoger(powerup) {
     this.registry.inc('powerups');
+    this.registry.inc('powerupsTotal');
+    sumarPuntos(this, PARTIDA.puntosPowerup);
     this.actualizarHUD();
-    this.aviso(powerup.x, powerup.y - 30, '¡POWER-UP!', '#7cf');
+    this.aviso(powerup.x, powerup.y - 30, '¡POWER-UP!', 'plata');
     this.cameras.main.flash(120, 255, 240, 160);
     powerup.destroy();
   }
@@ -1875,14 +2640,33 @@ class Nivel1 extends Phaser.Scene {
     this.estado = 'fin';
     this.jugador.setVelocityX(0).anims.stop();
     const { width, height } = this.scale;
-    this.add.text(width / 2, height / 2 - 40, '¡MISIÓN CUMPLIDA!', {
-      fontFamily: FUENTE_TITULO, fontSize: '56px', color: '#ffd23f', stroke: '#2a1a05', strokeThickness: 8
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+    misionCompleta(this); // Estado.js: tabla de puntaje
+  }
+
+  // Al apagar el modo admin (Admin.js) dentro de la piedra: sube hasta la
+  // primera celda libre y queda parado en su piso.
+  salirDeLaRoca() {
+    const b = this.jugador.body;
+    const col = Math.floor(b.center.x / TILE);
+    let fila = Math.floor((b.bottom - SUELO_Y - 1) / TILE);
+    if (!this.esSolido(col, fila)) return;
+    while (fila > 0 && this.esSolido(col, fila)) fila--;
+    this.jugador.body.reset(b.center.x, (fila + 1) * TILE + SUELO_Y - 30 * ESCALA);
   }
 
   // ---------------------------------------------------------------------------
 
   update(time, delta) {
+    // Editor de la colisión de la entrada a la cueva (tecla E).
+    if (this.estado === 'editor') { this.moverEditor(); this.actualizarParalaje(); return; }
+    // Modo admin (Admin.js): noclip y la cámara sin el tope del peñón.
+    const admin = this.estado === 'control' && noclipJugador(this);
+    if (admin) {
+      this.cameras.main.setBounds(0, 0, this.anchoNivel, this.altoNivel);
+      this.ladoPenon = null;
+    } else {
+      this.limitarCamaraPenon();
+    }
     this.animarRios(delta);
     this.actualizarParalaje();
     this.actualizarSombra(this.sombraJugador, this.jugador);
@@ -1897,9 +2681,12 @@ class Nivel1 extends Phaser.Scene {
     if (this.estado === 'entrada' && (j.x >= this.inicio.x || j.body.blocked.right || j.body.touching.right)) {
       this.terminarEntrada();
     }
-    if (this.estado === 'control') this.moverJugador();
+    if (this.estado === 'control' && !admin) this.moverJugador();
+    else if (!admin) cerrarSelector(this, false); // si el jugador deja de moverse (meta, puerta), sin cámara lenta
+    this.actualizarEntradaCueva(admin);
     this.moverRehenes();
     this.moverCholitas();
+    this.moverSoldados(); // Soldados.js
     this.moverNpcsPower();
     this.moverBalas();
   }
@@ -1907,3 +2694,49 @@ class Nivel1 extends Phaser.Scene {
 
 // Movimiento, animación, disparos y golpes del jugador (Jugador.js).
 Object.assign(Nivel1.prototype, AccionesJugador);
+
+// Texturas chicas de la entrada a la cueva (las grandes son archivos de
+// assets/cueva/, herramientas/entrada_cueva.py):
+//   cuevaOscuridad  el negro de adentro: transparente en la boca, ENTRADA_CUEVA.oscuro
+//                   al fondo (casi negro al final), difuminado arriba y abajo
+function texturasEntradaCueva(escena) {
+  if (escena.textures.exists('cuevaOscuridad')) return;
+  const C = ENTRADA_CUEVA;
+  const o = escena.textures.createCanvas('cuevaOscuridad', 256, 128);
+  const ctx = o.getContext();
+  const img = ctx.createImageData(256, 128);
+  const suave = (t) => t * t * (3 - 2 * t);
+  for (let y = 0; y < 128; y++) {
+    const v = y / 127;
+    const fy = suave(Math.min(1, v / 0.22)) * suave(Math.min(1, (1 - v) / 0.06 + 0.4));
+    for (let x = 0; x < 256; x++) {
+      const t = x / 255;
+      const fx = 0.35 + (C.oscuro - 0.35) * suave(Math.min(1, t / 0.4)) + (1 - C.oscuro) * suave(Math.max(0, Math.min(1, (t - 0.5) / 0.3)));
+      const i = (y * 256 + x) * 4;
+      img.data[i] = 4;
+      img.data[i + 1] = 3;
+      img.data[i + 2] = 6;
+      img.data[i + 3] = Math.round(255 * fx * fy);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  o.refresh();
+  // La del suelo: el mismo degradado hacia el fondo, entera arriba y nula abajo.
+  const os = escena.textures.createCanvas('cuevaOscuridadSuelo', 256, 64);
+  const cs = os.getContext();
+  const is = cs.createImageData(256, 64);
+  for (let y = 0; y < 64; y++) {
+    const fy = 1 - suave(y / 63);
+    for (let x = 0; x < 256; x++) {
+      const t = x / 255;
+      const fx = 0.35 + (C.oscuro - 0.35) * suave(Math.min(1, t / 0.4)) + (1 - C.oscuro) * suave(Math.max(0, Math.min(1, (t - 0.5) / 0.3)));
+      const i = (y * 256 + x) * 4;
+      is.data[i] = 4;
+      is.data[i + 1] = 3;
+      is.data[i + 2] = 6;
+      is.data[i + 3] = Math.round(255 * fx * fy);
+    }
+  }
+  cs.putImageData(is, 0, 0);
+  os.refresh();
+}

@@ -9,7 +9,8 @@ const config = {
   backgroundColor: '#bdc1a0',
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    fullscreenTarget: 'juego' // pantalla completa (Pausa.js): el div del juego
   },
   physics: {
     default: 'arcade',
@@ -17,14 +18,24 @@ const config = {
     // para ajustar las plataformas de los props. Ponerlo en false al terminar.
     arcade: { gravity: { y: 800 }, debug: false }
   },
-  scene: [Menu, CharacterSelectScene, Nivel1, Interior, JefeFinal]
+  // CapaSelector (Armas.js): la rueda del selector de armas, encima de todo.
+  scene: [Menu, CharacterSelectScene, Nivel1, Interior, Cueva, JefeFinal, CapaSelector, Pausa, GameOver, Resultado]
 };
 
-// Espera las fuentes de index.html (Google Fonts) para que los textos de Phaser
-// no se dibujen con la fuente por defecto; sin internet arranca igual a los 2 s.
-const fuentes = Promise.all([
-  document.fonts.load('32px "Black Ops One"'),
-  document.fonts.load('16px "Press Start 2P"')
-]);
+// Para probar una escena suelta: index.html?escena=Cueva arranca directo en ella.
+const escenaInicial = new URLSearchParams(location.search).get('escena');
+if (escenaInicial) {
+  const elegida = config.scene.find((c) => c.name === escenaInicial);
+  if (elegida) config.scene = [elegida, ...config.scene.filter((c) => c !== elegida)];
+}
+
+// Espera "Press Start 2P" (Google Fonts): TextFX.js genera con ella las
+// fuentes bitmap del juego. Sin internet arranca igual a los 2 s (con la
+// fuente monoespaciada del sistema).
+const fuentes = document.fonts.load('8px "Press Start 2P"');
 const espera = new Promise((resolver) => setTimeout(resolver, 2000));
-Promise.race([fuentes, espera]).catch(() => {}).finally(() => new Phaser.Game(config));
+// window.juego: para revisar el juego desde la consola del navegador.
+Promise.race([fuentes, espera]).catch(() => {}).finally(() => {
+  window.juego = new Phaser.Game(config);
+  window.juego.sound.volume = AJUSTES.general; // Pausa.js: el volumen guardado
+});

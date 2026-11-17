@@ -2,11 +2,11 @@
 // Interior de una casa: sala aparte del tamaño de la pantalla, cámara fija.
 //
 // Nivel1 se duerme (conserva todo su estado) y lanza esta escena con
-//   { tipo: 'choza' | 'casa_destruida', id, recompensaTomada }.
+//   { tipo: 'choza' | 'casa_destruida' | 'casa_ladrillo', id, recompensaTomada }.
 // Al salir por la puerta, esta escena se detiene y despierta a Nivel1 con
 //   { id, recompensa } para que deje al jugador frente a la misma puerta.
 //
-// Las imágenes (assets/fondos/Interiores/, 512x288) se dibujan a x2. Las
+// Las imágenes (assets/fondos/Interiores/, 512x288; la casa de ladrillo 896x296). Las
 // medidas vienen de medidas_interiores.txt, en píxeles de la imagen.
 // Usa las texturas y animaciones que ya cargó Nivel1 (jugador elegido, rehén, power-up).
 // =============================================================================
@@ -30,7 +30,9 @@ const INTERIORES = {
     pendiente: { desde: [229.5, 257], hasta: [351, 144] },
     salida: [26, 54, 172, 257],
     // Recompensa: un rehén atado en el piso de arriba.
-    recompensa: { tipo: 'rehen', x: 450, y: 144 }
+    recompensa: { tipo: 'rehen', x: 450, y: 144 },
+    // Caja de armas (Armas.js) abajo, antes de la escalera.
+    cajaArmas: { x: 140, y: 257, arma: 'lanzagranadas' }
   },
   choza: {
     paredes: [30, 480],
@@ -38,7 +40,24 @@ const INTERIORES = {
     pisos: [],
     salida: [45, 79, 101, 259],
     // Recompensa: power-up junto a las cajas de la derecha.
-    recompensa: { tipo: 'powerup', x: 400, y: 259 }
+    recompensa: { tipo: 'powerup', x: 400, y: 259 },
+    cajaArmas: { x: 250, y: 259, arma: 'ak47' }
+  },
+  // Casa de ladrillo (assets/fondos/interior_casa.jpeg, achicada con
+  // herramientas/interior_casa.py a 896x296). Más ancha que la pantalla: la
+  // cámara sigue al jugador. Dos pisos; el de arriba tiene un agujero y se
+  // sube por la escalera de la derecha.
+  casa_ladrillo: {
+    paredes: [42, 870],
+    pisoSolido: 264,
+    pisos: [[10, 498, 136], [582, 872, 136]],
+    // Escalera: los escalones van de (687, 230) a (750, 172); se alarga hasta
+    // el piso de abajo y termina a la altura del piso de arriba.
+    pendiente: { desde: [650.5, 264], hasta: [790, 136] },
+    salida: [57, 99, 183, 264],
+    // Recompensa: un rehén atado arriba, pasando el agujero.
+    recompensa: { tipo: 'rehen', x: 650, y: 136 },
+    cajaArmas: { x: 385, y: 264, arma: 'escopeta' }
   }
 };
 
@@ -61,6 +80,7 @@ class Interior extends Phaser.Scene {
   preload() {
     this.load.image('interior_casa_destruida', 'assets/fondos/Interiores/casa_destruida.png');
     this.load.image('interior_choza', 'assets/fondos/Interiores/choza.png');
+    this.load.image('interior_casa_ladrillo', 'assets/fondos/Interiores/casa_ladrillo.png');
   }
 
   create() {
@@ -68,8 +88,10 @@ class Interior extends Phaser.Scene {
     const sala = this.sala;
     const E = INTERIOR.escala;
     const imagen = this.textures.get(`interior_${this.datos.tipo}`).getSourceImage();
-    // Sala centrada en la pantalla: píxeles de la imagen -> pantalla.
-    const ox = (width - imagen.width * E) / 2;
+    // Sala centrada en la pantalla: píxeles de la imagen -> pantalla. Si es más
+    // ancha que la pantalla, el mundo mide lo que la sala y la cámara la recorre.
+    const mundo = Math.max(width, imagen.width * E);
+    const ox = (mundo - imagen.width * E) / 2;
     const oy = (height - imagen.height * E) / 2;
     const px = (v) => ox + v * E;
     const py = (v) => oy + v * E;
@@ -79,14 +101,14 @@ class Interior extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(INTERIOR.marco);
     this.add.image(ox, oy, `interior_${this.datos.tipo}`).setOrigin(0).setScale(E);
 
-    // Cámara fija; paredes como límite del mundo.
-    this.cameras.main.setBounds(0, 0, width, height);
+    // Cámara fija (o siguiendo al jugador en una sala ancha); paredes como límite del mundo.
+    this.cameras.main.setBounds(0, 0, mundo, height);
     this.physics.world.setBounds(px(sala.paredes[0]), 0, (sala.paredes[1] - sala.paredes[0]) * E, height);
     this.physics.world.setBoundsCollision(true, true, true, false);
 
     // Colisiones: piso sólido de abajo y pisos one-way de arriba.
     this.suelo = this.physics.add.staticGroup();
-    this.suelo.add(this.add.zone(width / 2, py(sala.pisoSolido) + 20, width, 40));
+    this.suelo.add(this.add.zone(mundo / 2, py(sala.pisoSolido) + 20, mundo, 40));
     this.pisos = this.physics.add.staticGroup();
     sala.pisos.forEach(([x0, x1, y]) => {
       const zona = this.add.zone(px((x0 + x1) / 2), py(y) + 3, (x1 - x0) * E, 6);
@@ -99,13 +121,24 @@ class Interior extends Phaser.Scene {
     this.puerta = { x0: px(s0), x1: px(s1), abajo: py(sAbajo) };
     this.jugador = this.physics.add.sprite(px((s0 + s1) / 2), py(sAbajo) - 30 * ESCALA, texturaJugador(this), 0)
       .setScale(ESCALA).setDepth(10).setCollideWorldBounds(true);
-    this.jugador.body.setSize(20, 56).setOffset(28, 16);
+    fisicaJugador(this.jugador); // Jugador.js: cuerpo, gravedad y caída
+    this.cuerpoTuto = cuerpoJugador(this); // piernas + torso de Tuto (CuerpoTuto.js) o null
     this.physics.add.collider(this.jugador, this.suelo);
+    if (mundo > width) this.cameras.main.startFollow(this.jugador, true, 0.15, 0);
+    else this.cameras.main.stopFollow().setScroll(0, 0);
     this.bajandoHasta = 0;
-    this.physics.add.collider(this.jugador, this.pisos, null, (j, piso) =>
+    this.sobrePisoEn = -Infinity;
+    this.physics.add.collider(this.jugador, this.pisos, () => { this.sobrePisoEn = this.time.now; }, (j, piso) =>
       this.time.now >= this.bajandoHasta && j.body.velocity.y >= 0 && j.body.prev.y + j.body.height <= piso.body.top + 10);
 
     this.sombra = this.add.ellipse(0, 0, SOMBRA.jugador, SOMBRA.alto, 0x000000, SOMBRA.alfa).setDepth(9);
+    panelVida(this); // Jugador.js: acá no hay golpes, solo se muestra
+    hudVidas(this);  // Estado.js
+    this.hudArma = hudArma(this);
+    // Caja de armas: acá no se dispara, se abre tocándola (Armas.js). Abierta
+    // una vez, no vuelve a aparecer.
+    const caja = this.sala.cajaArmas;
+    if (caja) crearCajaArmas(this, this.px(caja.x), this.py(caja.y) + HUNDIDO, caja.arma, `${this.datos.id}-caja`);
     this.crearRecompensa();
     this.crearFlechaSalida();
 
@@ -142,7 +175,7 @@ class Interior extends Phaser.Scene {
     objeto.body.enable = false;
     const rehen = this.sala.recompensa.tipo === 'rehen';
     this.registry.inc(rehen ? 'rehenes' : 'powerups');
-    this.aviso(objeto.x, objeto.y - (rehen ? NPC.alto * ESCALA : 40), rehen ? '¡GRACIAS!' : '¡POWER-UP!', rehen ? '#ffd23f' : '#7cf');
+    this.aviso(objeto.x, objeto.y - (rehen ? NPC.alto * ESCALA : 40), rehen ? '¡GRACIAS!' : '¡POWER-UP!', rehen ? 'oro' : 'plata');
     if (!rehen) {
       this.cameras.main.flash(120, 255, 240, 160);
       objeto.destroy();
@@ -156,11 +189,9 @@ class Interior extends Phaser.Scene {
     });
   }
 
+  // color: 'oro', 'plata' o 'rojo' (TextFX).
   aviso(x, y, texto, color) {
-    const t = this.add.text(x, y, texto, {
-      fontFamily: FUENTE_PIXEL, fontSize: '12px', color, stroke: '#000000', strokeThickness: 4
-    }).setOrigin(0.5).setDepth(20);
-    this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 1200, onComplete: () => t.destroy() });
+    TextFX.popup(this, x, y, texto, { color }).setDepth(20);
   }
 
   crearFlechaSalida() {
@@ -184,6 +215,7 @@ class Interior extends Phaser.Scene {
     const j = this.jugador;
     const b = j.body;
     if (this.saliendo) return;
+    if (noclipJugador(this)) return; // modo admin (Admin.js)
     const izquierda = this.teclas.left.isDown || this.teclasExtra.A.isDown;
     const derecha = this.teclas.right.isDown || this.teclasExtra.D.isDown;
     const arriba = this.teclas.up.isDown || this.teclasExtra.W.isDown;
@@ -215,8 +247,8 @@ class Interior extends Phaser.Scene {
     j.setVelocityX(direccion * JUGADOR.velocidad);
     if (direccion) j.setFlipX(direccion < 0);
     const saltar = espacio || (arriba && !enPuerta);
-    if (saltar && abajo && enSuelo) {
-      this.bajandoHasta = this.time.now + 250; // ↓ + salto: se deja caer del piso de arriba
+    if (abajo && enSuelo && this.time.now - this.sobrePisoEn < 100) {
+      this.bajandoHasta = this.time.now + 250; // ABAJO en el piso de arriba: se deja caer
     } else if (saltar && enSuelo && !this.saltoPresionado) {
       j.setVelocityY(-JUGADOR.salto);
     }
@@ -224,7 +256,7 @@ class Interior extends Phaser.Scene {
 
     if (!enSuelo) {
       j.anims.stop();
-      j.setFrame(2);
+      j.setFrame(CUADROS_JUGADOR[texturaJugador(this)].aire);
     } else if (direccion) {
       j.anims.play('jugador_caminar', true);
     } else {

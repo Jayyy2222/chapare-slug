@@ -29,7 +29,7 @@ function tocarMusica(escena, nombre) {
   if (actual) actual.destroy();
   if (!escena.cache.audio.exists(clave)) return; // no se pudo cargar: el juego sigue sin música
 
-  const musica = sonidos.add(clave, { loop: true, volume: MUSICAS[nombre].volumen });
+  const musica = sonidos.add(clave, { loop: true, volume: volumenMusica(nombre) });
   sonidos.musicaActual = musica;
   // El navegador no deja sonar nada hasta que el jugador toca una tecla o
   // hace clic: en ese caso arranca apenas se desbloquee el audio.
@@ -38,4 +38,10 @@ function tocarMusica(escena, nombre) {
   } else {
     musica.play();
   }
+}
+
+// Volumen de una pista con el ajuste de música del menú de pausa (Pausa.js).
+function volumenMusica(nombre) {
+  const ajuste = typeof AJUSTES !== 'undefined' ? AJUSTES.musica : 1;
+  return (MUSICAS[nombre] ? MUSICAS[nombre].volumen : 0.4) * ajuste;
 }

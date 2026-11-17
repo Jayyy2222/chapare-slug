@@ -777,3 +777,44 @@ function texturaSenderoFondo(escena, clave, semilla, niebla, ancho = 256, alto =
   }
   l.aTextura(escena, clave);
 }
+
+// Boca de cueva para la cara de un peñón (Nivel1: crearCueva): un arco de
+// piedras con musgo arriba y la oscuridad de adentro, que se aclara hacia el
+// borde. La cara de la roca queda a la derecha (se espeja para el otro lado).
+function texturaBocaCueva(escena, clave = 'bocaCueva') {
+  if (escena.textures.exists(clave)) return;
+  const P = PALETA_TERRENO;
+  const ancho = 72;
+  const alto = 84;
+  const l = new LienzoPixel(ancho, alto, 'boca');
+  const cx = ancho / 2;
+  const radioX = 26;
+  const radioY = 64;
+  const anillo = 7;
+  // d < 1: adentro de la boca; entre 1 y el anillo: las piedras del arco.
+  const distancia = (x, y) => Math.hypot((x - cx) / radioX, (y - alto) / radioY);
+  for (let y = 0; y < alto; y++) {
+    for (let x = 0; x < ancho; x++) {
+      const d = distancia(x, y) + l.grano(x, y, 3) * 0.04;
+      if (d < 1) {
+        // Oscuridad: casi negra al fondo, la tierra de la cueva cerca del borde.
+        const v = Math.max(0, (d - 0.55) / 0.45);
+        l.pintar(x, y, tonoTerreno(P.cueva, v * 0.9 + l.grano(x, y, 2) * 0.05));
+      } else if (d < 1 + anillo / radioX) {
+        // Piedras del arco: bloques con junta oscura entre ellos.
+        const angulo = Math.atan2(alto - y, x - cx);
+        const bloque = Math.floor(angulo / 0.32);
+        const junta = Math.abs(angulo / 0.32 - bloque - 0.5) > 0.44 || d > 1 + (anillo - 1) / radioX || d < 1.03;
+        l.pintar(x, y, junta ? P.contorno : P.piedra[1 + ((bloque + Math.round(l.grano(x, y, 2) * 2)) & 3) % 4]);
+      }
+    }
+  }
+  // Musgo colgando del arco (de arriba, sin tapar la boca).
+  for (let x = 6; x < ancho - 6; x++) {
+    const y0 = Math.round(alto - radioY * Math.sqrt(Math.max(0, 1 - ((x - cx) / (radioX + anillo)) ** 2))) - 1;
+    if (y0 > alto - 20 || l.grano(x, 0, 3) < -0.1) continue;
+    const largo = l.grano(x, 1, 2) > 0.4 ? l.rnd.between(3, 7) : l.rnd.between(1, 3);
+    for (let k = 0; k < largo; k++) l.pintar(x, y0 + k, P.musgo[Math.max(0, 3 - (k >> 1))]);
+  }
+  l.aTextura(escena, clave);
+}
