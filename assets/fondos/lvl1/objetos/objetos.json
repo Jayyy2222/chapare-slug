@@ -1,0 +1,142 @@
+{
+ "puesto_frutas": {
+  "ancho": 117,
+  "alto": 89,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "mototaxi": {
+  "ancho": 79,
+  "alto": 60,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "combi_vieja": {
+  "ancho": 94,
+  "alto": 76,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "hamaca": {
+  "ancho": 76,
+  "alto": 59,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "banca_mesa": {
+  "ancho": 78,
+  "alto": 31,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "cajas_platano": {
+  "ancho": 81,
+  "alto": 60,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "turril_lluvia": {
+  "ancho": 37,
+  "alto": 56,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "tendedero": {
+  "ancho": 89,
+  "alto": 65,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "letrero": {
+  "ancho": 46,
+  "alto": 69,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "cerca": {
+  "ancho": 70,
+  "alto": 45,
+  "lamina": "objetos_chapare.jpeg"
+ },
+ "atalaya": {
+  "ancho": 112,
+  "alto": 157,
+  "lamina": "objetos2.jpeg"
+ },
+ "carpa": {
+  "ancho": 127,
+  "alto": 142,
+  "lamina": "objetos2.jpeg"
+ },
+ "radio": {
+  "ancho": 81,
+  "alto": 170,
+  "lamina": "objetos2.jpeg"
+ },
+ "jeep_quemado": {
+  "ancho": 119,
+  "alto": 72,
+  "lamina": "objetos2.jpeg"
+ },
+ "barricada_tablas": {
+  "ancho": 89,
+  "alto": 51,
+  "lamina": "objetos3.jpeg"
+ },
+ "sacos_bajo": {
+  "ancho": 86,
+  "alto": 28,
+  "lamina": "objetos3.jpeg"
+ },
+ "sacos_alto": {
+  "ancho": 96,
+  "alto": 47,
+  "lamina": "objetos3.jpeg"
+ },
+ "sacos_pila": {
+  "ancho": 76,
+  "alto": 31,
+  "lamina": "objetos3.jpeg"
+ },
+ "sacos_pila2": {
+  "ancho": 62,
+  "alto": 30,
+  "lamina": "objetos3.jpeg"
+ },
+ "turril_oxidado": {
+  "ancho": 26,
+  "alto": 42,
+  "lamina": "objetos3.jpeg"
+ },
+ "turril_tirado": {
+  "ancho": 49,
+  "alto": 30,
+  "lamina": "objetos3.jpeg"
+ },
+ "turril_tnt": {
+  "ancho": 26,
+  "alto": 42,
+  "lamina": "objetos3.jpeg"
+ },
+ "caja_madera": {
+  "ancho": 42,
+  "alto": 41,
+  "lamina": "objeto4.jpeg"
+ },
+ "caja_rota": {
+  "ancho": 51,
+  "alto": 43,
+  "lamina": "objeto4.jpeg"
+ },
+ "galpon": {
+  "ancho": 130,
+  "alto": 73,
+  "lamina": "objeto4.jpeg"
+ },
+ "galpon_roto": {
+  "ancho": 158,
+  "alto": 72,
+  "lamina": "objeto4.jpeg"
+ },
+ "escombros": {
+  "ancho": 118,
+  "alto": 62,
+  "lamina": "objeto4.jpeg"
+ },
+ "reflector": {
+  "ancho": 32,
+  "alto": 72,
+  "lamina": "objeto4.jpeg"
+ }
+}
