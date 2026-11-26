@@ -1,0 +1,141 @@
+{
+ "modulos": {
+  "recta": {
+   "ancho": 432,
+   "alto": 191,
+   "riel": [
+    56,
+    56
+   ],
+   "relleno": true
+  },
+  "subida": {
+   "ancho": 432,
+   "alto": 215,
+   "riel": [
+    163,
+    39
+   ],
+   "relleno": true
+  },
+  "bajada": {
+   "ancho": 432,
+   "alto": 202,
+   "riel": [
+    43,
+    160
+   ],
+   "relleno": true
+  },
+  "puente": {
+   "ancho": 432,
+   "alto": 198,
+   "riel": [
+    93,
+    93
+   ],
+   "relleno": false
+  },
+  "caballete": {
+   "ancho": 432,
+   "alto": 181,
+   "riel": [
+    34,
+    34
+   ],
+   "relleno": false
+  },
+  "hueco_a": {
+   "ancho": 181,
+   "alto": 150,
+   "riel": [
+    45,
+    45
+   ],
+   "relleno": true
+  },
+  "hueco_b": {
+   "ancho": 180,
+   "alto": 150,
+   "riel": [
+    45,
+    45
+   ],
+   "relleno": true
+  },
+  "viga": {
+   "ancho": 431,
+   "alto": 173,
+   "riel": [
+    98,
+    98
+   ],
+   "relleno": true
+  },
+  "cambio": {
+   "ancho": 432,
+   "alto": 185,
+   "riel": [
+    111,
+    111
+   ],
+   "relleno": true,
+   "palanca": [
+    282,
+    46,
+    34
+   ]
+  },
+  "tope": {
+   "ancho": 323,
+   "alto": 183,
+   "riel": [
+    108,
+    108
+   ],
+   "relleno": true
+  }
+ },
+ "hojas": {
+  "carro": [
+   152,
+   63,
+   4
+  ],
+  "enemigo": [
+   152,
+   68,
+   3
+  ],
+  "destruccion": [
+   157,
+   70,
+   6
+  ],
+  "chispas": [
+   84,
+   31,
+   4
+  ],
+  "polvo": [
+   155,
+   73,
+   3
+  ],
+  "astillas": [
+   109,
+   41,
+   4
+  ],
+  "velocidad": [
+   173,
+   42,
+   3
+  ],
+  "heroe": [
+   141,
+   87,
+   16
+  ]
+ }
+}

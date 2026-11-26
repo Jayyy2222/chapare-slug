@@ -1,0 +1,22 @@
+{
+ "nivel": "Caverna del jefe: la persecución (px del mundo). Editar con la tecla E.",
+ "ancho": 2322,
+ "ground": [
+  { "x0": 0, "y0": 482, "x1": 2322, "y1": 482 }
+ ],
+ "platforms": [
+  { "x0": 78, "x1": 340, "y": 228 },
+  { "x0": 505, "x1": 940, "y": 293 },
+  { "x0": 1060, "x1": 1236, "y": 288 },
+  { "x0": 1626, "x1": 2021, "y": 300 }
+ ],
+ "walls": [
+  { "x": 0, "y": -200, "w": 2322, "h": 245 }
+ ],
+ "ladders": [
+  { "x0": 197, "x1": 229, "arriba": 228, "abajo": 482 },
+  { "x0": 742, "x1": 778, "arriba": 293, "abajo": 482 },
+  { "x0": 1781, "x1": 1816, "arriba": 300, "abajo": 482 }
+ ],
+ "tejas": []
+}

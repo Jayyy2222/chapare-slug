@@ -1,0 +1,57 @@
+{
+ "inicio": { "riel": 420 },
+ "anchoHueco": 170,
+ "altoDesvio": -190,
+ "secuencia": [
+  { "m": "recta", "eventos": ["cartel:¡AGÁRRATE!"] },
+  "recta",
+  { "m": "recta", "eventos": ["murcielagos"] },
+  "subida",
+  { "m": "recta", "eventos": ["carrito_atras"] },
+  "bajada",
+  "recta",
+  { "m": "hueco", "eventos": ["cartel:¡SALTA!"] },
+  { "m": "recta", "eventos": ["barril"] },
+  "puente",
+  { "m": "puente", "eventos": ["carrito_fondo"] },
+  "recta",
+  { "m": "viga", "eventos": ["cartel:¡AGÁCHATE!"] },
+  { "m": "recta", "eventos": ["soldado"] },
+  "subida",
+  { "m": "recta", "eventos": ["carrito_adelante"] },
+  "recta",
+  { "m": "bajada", "eventos": ["murcielagos"] },
+  "recta",
+  { "m": "cambio", "eventos": ["cartel:¡DISPARA A LA PALANCA!"] },
+  { "desvio": {
+    "a": [
+     { "m": "recta", "eventos": ["barril"] },
+     { "m": "viga" },
+     { "m": "recta", "eventos": ["soldado"] },
+     { "m": "recta", "eventos": ["barril"] }
+    ],
+    "b": [
+     { "m": "caballete", "eventos": ["plata"] },
+     { "m": "caballete", "eventos": ["murcielagos"] },
+     { "m": "caballete", "eventos": ["plata"] },
+     "caballete"
+    ]
+  } },
+  { "m": "recta", "eventos": ["carrito_atras"] },
+  "subida",
+  "hueco",
+  { "m": "recta", "eventos": ["soldado"] },
+  { "m": "puente", "eventos": ["carrito_fondo"] },
+  "caballete",
+  { "m": "recta", "eventos": ["barril"] },
+  "viga",
+  { "m": "recta", "eventos": ["murcielagos"] },
+  "bajada",
+  { "m": "recta", "eventos": ["carrito_adelante"] },
+  "recta",
+  "hueco",
+  { "m": "recta", "eventos": ["cartel:¡EL FINAL DE LA VÍA!"] },
+  "recta",
+  "tope"
+ ]
+}
