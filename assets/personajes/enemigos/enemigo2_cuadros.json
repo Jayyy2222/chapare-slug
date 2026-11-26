@@ -1,0 +1,13 @@
+{
+ "ancho": 110,
+ "alto": 70,
+ "caminar": 8,
+ "ataque": 6,
+ "muerte": 6,
+ "ponchos": [
+  "granate",
+  "verde",
+  "ocre",
+  "azul"
+ ]
+}

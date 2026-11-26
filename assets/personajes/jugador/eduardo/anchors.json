@@ -1,0 +1,247 @@
+{
+ "torso_aiming": {
+  "ancho": 62,
+  "alto": 74,
+  "ancla": [
+   24,
+   73
+  ],
+  "cuadros": [
+   {
+    "mano": [
+     52,
+     34
+    ]
+   },
+   {
+    "mano": [
+     52,
+     33
+    ]
+   },
+   {
+    "mano": [
+     52,
+     33
+    ]
+   },
+   {
+    "mano": [
+     52,
+     34
+    ]
+   }
+  ]
+ },
+ "torso_arriba": {
+  "ancho": 52,
+  "alto": 91,
+  "ancla": [
+   25,
+   89
+  ],
+  "cuadros": [
+   {
+    "mano": [
+     35,
+     19
+    ]
+   },
+   {
+    "mano": [
+     35,
+     11
+    ]
+   },
+   {
+    "mano": [
+     33,
+     14
+    ]
+   },
+   {
+    "mano": [
+     31,
+     17
+    ]
+   }
+  ]
+ },
+ "idle": {
+  "ancho": 53,
+  "alto": 129,
+  "ancla": [
+   27,
+   128
+  ],
+  "cuadros": [
+   {},
+   {},
+   {},
+   {},
+   {},
+   {},
+   {}
+  ]
+ },
+ "muerte": {
+  "ancho": 115,
+  "alto": 125,
+  "ancla": [
+   57,
+   124
+  ],
+  "cuadros": [
+   {},
+   {},
+   {},
+   {},
+   {},
+   {},
+   {},
+   {},
+   {},
+   {}
+  ]
+ },
+ "trepar": {
+  "ancho": 56,
+  "alto": 134,
+  "ancla": [
+   28,
+   133
+  ],
+  "cuadros": [
+   {},
+   {},
+   {},
+   {},
+   {},
+   {}
+  ]
+ },
+ "piernas_run": {
+  "ancho": 96,
+  "alto": 57,
+  "ancla": [
+   45,
+   7
+  ],
+  "cuadros": [
+   {
+    "pies": 55
+   },
+   {
+    "pies": 56
+   },
+   {
+    "pies": 56
+   },
+   {
+    "pies": 44
+   },
+   {
+    "pies": 56
+   },
+   {
+    "pies": 56
+   },
+   {
+    "pies": 56
+   },
+   {
+    "pies": 55
+   }
+  ]
+ },
+ "piernas_salto": {
+  "ancho": 66,
+  "alto": 90,
+  "ancla": [
+   29,
+   10
+  ],
+  "cuadros": [
+   {
+    "pies": 64
+   },
+   {
+    "pies": 89
+   },
+   {
+    "pies": 68
+   },
+   {
+    "pies": 83
+   },
+   {
+    "pies": 64
+   },
+   {
+    "pies": 66
+   }
+  ]
+ },
+ "piernas_crouch": {
+  "ancho": 56,
+  "alto": 69,
+  "ancla": [
+   24,
+   3
+  ],
+  "cuadros": [
+   {
+    "pies": 68
+   },
+   {
+    "pies": 57
+   },
+   {
+    "pies": 57
+   }
+  ]
+ },
+ "piernas_crouch_walk": {
+  "ancho": 85,
+  "alto": 51,
+  "ancla": [
+   40,
+   8
+  ],
+  "cuadros": [
+   {
+    "pies": 45
+   },
+   {
+    "pies": 46
+   },
+   {
+    "pies": 46
+   },
+   {
+    "pies": 46
+   },
+   {
+    "pies": 46
+   },
+   {
+    "pies": 47
+   },
+   {
+    "pies": 49
+   },
+   {
+    "pies": 50
+   },
+   {
+    "pies": 50
+   },
+   {
+    "pies": 48
+   },
+   {
+    "pies": 47
+   }
+  ]
+ }
+}

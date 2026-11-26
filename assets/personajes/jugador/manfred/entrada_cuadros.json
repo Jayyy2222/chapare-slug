@@ -1,0 +1,16 @@
+{
+ "helicoptero": {
+  "ancho": 294,
+  "alto": 181,
+  "cuadros": 4,
+  "soga": [
+   147,
+   180
+  ]
+ },
+ "manfred": {
+  "ancho": 90,
+  "alto": 133,
+  "cuadros": 6
+ }
+}

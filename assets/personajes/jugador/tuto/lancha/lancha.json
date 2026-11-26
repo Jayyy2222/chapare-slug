@@ -1,0 +1,58 @@
+{
+ "cerros": [
+  1080,
+  217
+ ],
+ "selva": [
+  1080,
+  217
+ ],
+ "orilla": [
+  1200,
+  218
+ ],
+ "juncos": [
+  1200,
+  211
+ ],
+ "agua_lejana": [
+  1080,
+  140
+ ],
+ "agua_cercana": {
+  "ancho": 1080,
+  "alto": 101,
+  "cuadros": 4
+ },
+ "boat_ride": {
+  "ancho": 70,
+  "alto": 132,
+  "cuadros": 6
+ },
+ "boat_jump": {
+  "ancho": 150,
+  "alto": 132,
+  "cuadros": 6
+ },
+ "lancha": {
+  "ancho": 280,
+  "alto": 79,
+  "cuadros": 4
+ },
+ "escalas": {
+  "ride": 0.2318840579710145,
+  "jump": 0.34972677595628415,
+  "lancha": 0.5640754450907809
+ },
+ "espuma": {
+  "ancho": 84,
+  "alto": 60,
+  "cuadros": 4
+ },
+ "salpicadura": {
+  "ancho": 80,
+  "alto": 49,
+  "cuadros": 4
+ },
+ "destellos": 4
+}
