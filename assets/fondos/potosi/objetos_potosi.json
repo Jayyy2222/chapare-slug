@@ -1,0 +1,47 @@
+{
+ "bandera": {
+  "ancho": 104,
+  "alto": 92,
+  "cuadros": 3
+ },
+ "reflector": {
+  "ancho": 117,
+  "alto": 96,
+  "cuadros": 4
+ },
+ "palomas_comen": {
+  "ancho": 40,
+  "alto": 23,
+  "cuadros": 3
+ },
+ "palomas_vuelan": {
+  "ancho": 43,
+  "alto": 48,
+  "cuadros": 3
+ },
+ "pileta": {
+  "ancho": 116,
+  "alto": 135,
+  "cuadros": 4
+ },
+ "farol_calle": {
+  "ancho": 53,
+  "alto": 177,
+  "cuadros": 2
+ },
+ "llama_anda": {
+  "ancho": 93,
+  "alto": 113,
+  "cuadros": 4
+ },
+ "llama_corre": {
+  "ancho": 110,
+  "alto": 108,
+  "cuadros": 3
+ },
+ "turril_explota": {
+  "ancho": 113,
+  "alto": 75,
+  "cuadros": 6
+ }
+}
