@@ -10,7 +10,9 @@ magenta, con una franja oscura arriba y una línea abajo:
 
 Cada cuadro es una mancha grande de píxeles; las chicas (gotas de sudor,
 destellos, polvo) se suman a la mancha grande más cercana. Las sombras
-pintadas son magenta oscuro y se van con el fondo. Los cuadros se pegan con
+pintadas son magenta oscuro y se van con el fondo; el halo rosado que el
+JPEG deja en los bordes (el saco, la cara al correr, el polvo) se saca con
+sin_tinte_magenta. Los cuadros se pegan con
 los pies en el borde de abajo de la celda y centrados según los pies.
 
 Guarda en assets/personajes/npc/:
@@ -23,20 +25,23 @@ import json
 
 from PIL import Image
 
-from recorte_sprites import a_pixel_art, centro_pies, por_manchas, quitar_fondo
+from recorte_sprites import a_pixel_art, centro_pies, por_manchas, quitar_fondo, sin_tinte_magenta
 
 CARPETA = 'assets/personajes/npc/'
 FRANJA_ARRIBA = 12     # px de borde oscuro arriba de la hoja
 FRANJA_ABAJO = 4       # y la línea de abajo
 MANCHA_MINIMA = 2000   # px: menos que esto es un detalle suelto, no un cuadro
 ALTO_FILA = 185        # px aproximados de cada fila, para ordenar los cuadros
-ALTO_ARTE = 64         # px de arte del cuadro más alto: parado ~60, como los rehenes
+# px del cuadro más alto: el juego lo dibuja a escala 1 (antes iba a 64 y se
+# agrandaba al doble, borroso; así se ve con el detalle de los jugadores).
+ALTO_ARTE = 128
 MARGEN = 4
 LEJOS = 30             # px: un detalle más lejos de todo cuadro se descarta
+COLORES = 96           # paleta de cada cuadro (con menos, el saco se oscurecía en algunos)
 
 
 def main():
-    hoja = quitar_fondo(Image.open(CARPETA + 'npc_power.jpeg'))
+    hoja = sin_tinte_magenta(quitar_fondo(Image.open(CARPETA + 'npc_power.jpeg')))
     hoja = hoja.crop((0, FRANJA_ARRIBA, hoja.width, hoja.height - FRANJA_ABAJO))
     cuadros = por_manchas(hoja, MANCHA_MINIMA, ALTO_FILA, LEJOS)
 
@@ -49,7 +54,7 @@ def main():
     for i, c in enumerate(cuadros):
         celda = Image.new('RGBA', (ancho, alto))
         celda.paste(c, (round(ancho / 2 - centro_pies(c, 0.85)), alto - c.height), c)
-        resultado.paste(a_pixel_art(celda, chico, 48), (i * chico[0], 0))
+        resultado.paste(a_pixel_art(celda, chico, COLORES), (i * chico[0], 0))
     resultado.save(CARPETA + 'npc_power_sheet.png')
     with open(CARPETA + 'npc_power_cuadros.json', 'w') as f:
         json.dump({'ancho': chico[0], 'alto': chico[1], 'cuadros': len(cuadros)}, f)

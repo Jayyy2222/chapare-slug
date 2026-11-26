@@ -9,6 +9,7 @@
 //   FUEGO     J (mantener: dispara seguido)
 //   SALTO     ESPACIO (también confirma en los menús)
 //   ARMA      TAB (mantener y elegir con la cruz, como en la compu)
+//   TNT       K (lanza dinamita en la mina)
 //   OK        ENTER       II  ESC (pausa)
 //
 // Solo aparece en pantallas táctiles (o con index.html?tactil=1 para probar).
@@ -16,12 +17,18 @@
 // en iPhone conviene "Agregar a pantalla de inicio").
 // =============================================================================
 
+// Celular o tablet (la capa táctil está puesta): las escenas lo usan para
+// bajar efectos pesados (Light2D en la mina).
+function esMovil() {
+  return document.documentElement.classList.contains('tactil');
+}
+
 const TACTIL = {
   teclas: {
     ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
-    Space: 32, KeyJ: 74, Tab: 9, Escape: 27, Enter: 13
+    Space: 32, KeyJ: 74, KeyK: 75, Tab: 9, Escape: 27, Enter: 13
   },
-  nombres: { Space: ' ', KeyJ: 'j', Tab: 'Tab', Escape: 'Escape', Enter: 'Enter' },
+  nombres: { Space: ' ', KeyJ: 'j', KeyK: 'k', Tab: 'Tab', Escape: 'Escape', Enter: 'Enter' },
   zonaMuerta: 0.28 // de la cruz: cuánto hay que correr el dedo para que cuente
 };
 
@@ -61,13 +68,16 @@ const TACTIL = {
     <div class="boton fuego" data-tecla="KeyJ">FUEGO</div>
     <div class="boton salto" data-tecla="Space">SALTO</div>
     <div class="boton chico arma" data-tecla="Tab">ARMA</div>
+    <div class="boton chico tnt" data-tecla="KeyK">TNT</div>
     <div class="boton mini ok" data-tecla="Enter">OK</div>
     <div class="boton mini pausa" data-tecla="Escape">II</div>
+    <div class="boton mini completa" title="Pantalla completa"></div>
+    <div class="aviso-completa"></div>
     <div class="girar"><div class="icono">📱</div>GIRA EL CELULAR<br>PARA JUGAR</div>`;
   document.body.appendChild(capa);
 
   // Botones: cada dedo que lo toca lo mantiene apretado hasta que se levanta.
-  capa.querySelectorAll('.boton').forEach((b) => {
+  capa.querySelectorAll('.boton[data-tecla]').forEach((b) => {
     const code = b.dataset.tecla;
     const dedos = new Set();
     const actualizar = () => { b.classList.toggle('activo', dedos.size > 0); tecla(code, dedos.size > 0); };
@@ -137,6 +147,55 @@ const TACTIL = {
     }
   };
   window.addEventListener('pointerdown', completa, { once: true });
+
+  // Botón de pantalla completa (ícono dibujado: el símbolo ⛶ no está en las
+  // fuentes de muchos celulares). Usa toda la página (no solo el canvas) para
+  // que los controles táctiles sigan visibles. En iPhone Safari no existe
+  // pantalla completa para páginas: el botón explica cómo agregarlo a la
+  // pantalla de inicio (abierto desde ahí ya está a pantalla completa y el
+  // botón no aparece).
+  const ICONOS = {
+    entrar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/></svg>',
+    salir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M9 3v6H3M21 9h-6V3M15 21v-6h6M3 15h6v6"/></svg>'
+  };
+  const botonCompleta = capa.querySelector('.completa');
+  const avisoCompleta = capa.querySelector('.aviso-completa');
+  const el = document.documentElement;
+  const hayCompleta = !!(el.requestFullscreen || el.webkitRequestFullscreen);
+  const enCompleta = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const comoApp = navigator.standalone || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
+  if (comoApp) botonCompleta.classList.add('ya');
+  const marcar = () => { botonCompleta.innerHTML = enCompleta() ? ICONOS.salir : ICONOS.entrar; };
+  marcar();
+  document.addEventListener('fullscreenchange', marcar);
+  document.addEventListener('webkitfullscreenchange', marcar);
+  let ocultarAviso = null;
+  const explicar = () => {
+    const iphone = /iPhone|iPod/.test(navigator.userAgent);
+    avisoCompleta.innerHTML = iphone
+      ? '<b>PANTALLA COMPLETA</b><br>En iPhone: toca <b>Compartir</b> (el cuadrito con la flecha ⬆) y después <b>Agregar a pantalla de inicio</b>. Abre el juego desde ese ícono.'
+      : '<b>PANTALLA COMPLETA</b><br>Este navegador no la permite. Abre el juego en <b>Chrome</b> o usa <b>Agregar a pantalla de inicio</b> en el menú del navegador.';
+    avisoCompleta.style.display = 'block';
+    clearTimeout(ocultarAviso);
+    ocultarAviso = setTimeout(() => { avisoCompleta.style.display = 'none'; }, 6000);
+  };
+  avisoCompleta.addEventListener('pointerdown', (e) => { e.preventDefault(); avisoCompleta.style.display = 'none'; });
+  botonCompleta.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // que no lo tome también el pedido del primer toque
+    botonCompleta.classList.add('activo');
+    if (!hayCompleta) {
+      explicar();
+    } else if (enCompleta()) {
+      const salir = document.exitFullscreen || document.webkitExitFullscreen;
+      Promise.resolve(salir && salir.call(document)).catch(() => {});
+    } else {
+      window.removeEventListener('pointerdown', completa);
+      completa();
+    }
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) =>
+    botonCompleta.addEventListener(t, () => botonCompleta.classList.remove('activo')));
   // Sin menú del navegador al mantener apretado ni zoom con dos dedos.
   window.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('gesturestart', (e) => e.preventDefault());

@@ -15,14 +15,16 @@
 // --- Personajes --------------------------------------------------------------
 // Cada uno muestra o un retrato (hoja con gris / normal / gritando, como en
 // Metal Slug: gris si no está elegido, grita al confirmar) o una animación
-// (ANIMACIONES, o las de su hoja: Tuto, CuerpoTuto.js). escala: la del
+// (ANIMACIONES, o las de su hoja: Tuto, CuerpoModular.js). escala: la del
 // animado (si no, DISENO_SELECCION.escalaPersonaje). Para agregar uno basta
 // con editar este array.
 const PERSONAJES = [
   // Tuto: el idle de cuerpo entero (a px de pantalla: x2 llena la ventana).
   { id: 'tuto', nombre: 'TUTO', animIdle: 'tuto_idle', animPose: 'tuto_sel_pose', escala: 2, bloqueado: false },
   { id: 'manfred', nombre: 'MANFRED', retratos: 'selRetratoManfred', bloqueado: false },
-  { id: 'proximo', nombre: '???', bloqueado: true }
+  // Eduardo (con Juan, su compañero) y Bartolina: su idle de cuerpo entero.
+  { id: 'eduardo', nombre: 'EDUARDO', animIdle: 'eduardo_idle', animPose: 'eduardo_sel_pose', escala: 2, bloqueado: false },
+  { id: 'bartolina', nombre: 'BARTOLINA', animIdle: 'bartolina_idle', animPose: 'bartolina_sel_pose', escala: 1.5, bloqueado: false } // (pollera y manta anchas: a 2 se cortaba)
 ];
 
 // Cuadros de las hojas de retratos.
@@ -49,10 +51,11 @@ const SONIDOS_SELECCION = {
 const DISENO_SELECCION = {
   fondo: { ancho: 1232, alto: 864 },
   altoVisible: 768,
-  ventana: { ancho: 245, alto: 355 },            // donde va el personaje
-  ventanas: [[140, 312], [496, 314], [843, 315]], // esquina de arriba a la izquierda
-  placaNombre: [[265, 237], [616, 237], [966, 236]], // centro de la placa negra de arriba
-  placaAbajo: [[269, 733], [617, 733], [964, 733]],  // centro de la placa de metal de abajo
+  // seleccion4.jpeg (herramientas/seleccion4.py): 4 ventanas.
+  ventana: { ancho: 187, alto: 355 },            // donde va el personaje
+  ventanas: [[120, 312], [391, 314], [657, 314], [922, 315]], // esquina de arriba a la izquierda
+  placaNombre: [[215, 237], [483, 237], [749, 237], [1016, 236]], // centro de la placa negra de arriba
+  placaAbajo: [[218, 733], [484, 733], [749, 733], [1014, 733]],  // centro de la placa de metal de abajo
   escalaPersonaje: 3, // el soldado animado, entero para no deformar el pixel art
   segundos: 20,
   // Sala de interrogatorio: color de la pared, cuánto se oscurece el panel y
@@ -68,13 +71,13 @@ class CharacterSelectScene extends Phaser.Scene {
 
   preload() {
     const c = 'assets/seleccion/';
-    this.load.image('selFondo', c + 'seleccion1.jpeg');
+    this.load.image('selFondo', c + 'seleccion4.jpeg');
     // Piezas ya al tamaño de pantalla (herramientas/seleccion.py).
     this.load.spritesheet('selPersiana', c + 'persiana.png', { frameWidth: 184, frameHeight: 266 });
     this.load.spritesheet('selCartel', c + 'carteles.png', { frameWidth: 63, frameHeight: 68 });
     this.load.spritesheet('selBoton', c + 'botones.png', { frameWidth: 34, frameHeight: 34 });
     this.load.spritesheet('selRetratoManfred', c + 'manfred_retratos.png', { frameWidth: 193, frameHeight: 266 });
-    cargarTuto(this); // CuerpoTuto.js
+    cargarCuerpos(this); // CuerpoModular.js
 
     // Un frame puede repetirse entre animaciones: se carga una sola vez.
     Object.values(ANIMACIONES).forEach(({ carpeta, frames }) => {
@@ -171,11 +174,15 @@ class CharacterSelectScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   crearAnimaciones() {
-    // Tuto: sus animaciones (CuerpoTuto.js) y, al confirmar, el idle rápido.
-    animacionesTuto(this);
-    if (!this.anims.exists('tuto_sel_pose')) {
-      this.anims.create({ key: 'tuto_sel_pose', frames: [0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0].map((f) => ({ key: 'tuto_idle', frame: String(f) })), frameRate: 18 });
-    }
+    // Tuto: sus animaciones (CuerpoModular.js) y, al confirmar, el idle rápido.
+    ['tuto', 'eduardo', 'bartolina'].forEach((p) => {
+      animacionesCuerpo(this, p);
+      const n = this.cache.json.get(CUERPOS[p].prefijo + 'anclas').idle.cuadros.length;
+      const ida = [...Array(n).keys()];
+      if (!this.anims.exists(p + '_sel_pose')) {
+        this.anims.create({ key: p + '_sel_pose', frames: [...ida, ...ida.slice(0, -1).reverse()].map((f) => ({ key: p + '_idle', frame: String(f) })), frameRate: 18 });
+      }
+    });
     Object.entries(ANIMACIONES).forEach(([key, { carpeta, frames, fps, repeat }]) => {
       if (this.anims.exists(key)) return;
       this.anims.create({
@@ -495,7 +502,10 @@ class CharacterSelectScene extends Phaser.Scene {
     // 5. Fade a negro y al nivel.
     this.time.delayedCall(1600, () => {
       this.cameras.main.fadeOut(600, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Nivel1'));
+      // Modo ARENA (Arena.js) o la campaña (Manfred: antes, la cinemática del helicóptero).
+      const destino = this.registry.get('modo') === 'arena' ? 'Arena'
+        : this.registry.get('personaje') === 'manfred' ? 'Cinematica' : 'Nivel1';
+      this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(destino));
     });
   }
 }

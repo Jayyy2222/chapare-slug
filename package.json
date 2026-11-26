@@ -1,0 +1,16 @@
+{
+  "name": "chapare-slug",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chapare Slug: juego + servidor multijugador (salas por WebSocket)",
+  "main": "servidor/servidor.js",
+  "scripts": {
+    "start": "node servidor/servidor.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

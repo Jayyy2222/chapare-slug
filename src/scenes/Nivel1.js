@@ -37,6 +37,7 @@ const SUELO_Y = 16;
 //   nivel termina en la puerta del edificio final, ver PROPS_NIVEL1)
 //   C  cholita (enemigo que patrulla)   N  NPC que regala una hamburguesa (power-up)
 //   E  soldado (enemigo1: patrulla y dispara; Soldados.js)
+//   G  garrotero (enemigo2: patrulla, corre al jugador y le da garrotazos; Garroteros.js)
 //   En las columnas CUEVA_NIVEL1 hay un peñón de roca de arriba abajo: se
 //   cruza solo por la cueva (escena Cueva), que sale del otro lado.
 //   W  caja de armas (se abre a balazos o tocándola; trae un arma: CAJAS_NIVEL1, Armas.js)
@@ -47,7 +48,7 @@ const MAPA_NIVEL1 = [
   '..........*............................SSS.................................', // 0 (y = 0)
   '...............................H.......SSS..........*......................', // 1 (y = 128)
   '...........x.......H...................SSS.................................', // 2 (y = 256)
-  '.J.Ns.H.WC.xEE.E..............W.EEsEN..SSSW.EC.HEEW.E.EWE.HE.EC.sWEE..EE.E.', // 3 (y = 384)
+  '.J.Ns.H.WCGxEE.E..............WGEEsEN..SSSW.ECGHEEW.EGEWE.HEGEC.sWEEG.EE.EG', // 3 (y = 384)
   'SSSSSSSSSSSSSS34......H.....12SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS', // 4 (y = 512)
   'SSSSSSSSSSSSSSSS\\AAAAAAAAAA/SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS', // 5 (y = 640)
   'SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS' // 6 (y = 768)
@@ -165,22 +166,26 @@ const NPC = {
 // spritesheet por herramientas/npc_power_spritesheet.py (17 cuadros en una
 // fila, ver npc_power_cuadros.json). Espera saludando; al tocarlo el jugador
 // saca una hamburguesa, se la da (cuenta como power-up), salta de alegría,
-// hace la venia y desaparece en una nube de humo.
+// hace la venia, sale corriendo y desaparece en una nube de humo.
 const NPC_POWER = {
-  // Del tamaño de Manfred: parado ~60 px de arte (herramientas/npc_power_spritesheet.py).
-  ancho: 72, alto: 64,                 // celda del spritesheet (px de arte)
-  cuerpo: { ancho: 27, alto: 49 },     // caja de colisión (px de arte), apoyada en los pies
+  // Del tamaño de los jugadores: parado ~120 px (herramientas/npc_power_spritesheet.py).
+  // La hoja viene a px de pantalla: se dibuja a escala 1 (no a ESCALA).
+  ancho: 144, alto: 128,               // celda del spritesheet
+  escala: 1,
+  cuerpo: { ancho: 54, alto: 98 },     // caja de colisión (px de la celda), apoyada en los pies
   cuadros: {
     espera: [0, 0, 0, 0, 2, 0, 0, 0],  // parado, cada tanto se acomoda
     saluda: [1, 3, 1, 3, 4, 3],        // agita la mano cuando el jugador se acerca
     entrega: [8, 9, 10, 10, 11, 11],   // se da vuelta, saca la hamburguesa, la ofrece, pulgares
     festeja: [5, 6, 7, 7, 6, 5],       // se agacha y salta
     venia: [12, 12, 12],
-    corre: [14, 15, 16]
+    corre: [14, 15, 16, 15]            // ida y vuelta: el paso no salta del último al primero
   },
   cercania: 260,                       // px a los que empieza a saludar
   salto: 56,                           // px que sube al festejar
-  velocidadHuida: 240                  // corre hacia la derecha hasta salir de la pantalla
+  velocidadHuida: 240,                 // corre hacia la derecha...
+  carrera: 900,                        // ...estos ms y desaparece (puf)
+  polvo: 110                           // ms entre nubecitas de polvo al correr
 };
 
 // Cholitas (enemigos): cholita.jpeg y cholita_ataque.jpeg de
@@ -226,6 +231,7 @@ const CHOLITA = {
 //              interior (escena Interior, ver INTERIORES en Interior.js)
 //   detras:    se dibuja detrás del terreno: los pilotes que entran en la
 //              tierra quedan tapados por la orilla, como enterrados
+const OBJETOS_ALDEA = 'assets/fondos/lvl1/objetos/';
 const PROPS = {
   muelle: {
     pisos: [[0, 216, 29]], detras: true,
@@ -258,7 +264,44 @@ const PROPS = {
   // Edificio del final (assets/fondos/final/edif_final.jpeg, limpiado con
   // herramientas/edificio_final.py). Su puerta lleva a la pelea con el jefe
   // (escena JefeFinal); el umbral es el pie de la escalera.
-  edif_final: { ruta: 'assets/fondos/final/', puerta: [293, 387, 380, 514], interior: 'final' }
+  edif_final: { ruta: 'assets/fondos/final/', puerta: [293, 387, 380, 514], interior: 'final' },
+  // Objetos de la aldea (assets/fondos/lvl1/objetos_chapare.jpeg recortada
+  // con herramientas/objetos_chapare.py; el horno de barro no va). Casi todos
+  // son solo decorado; la combi (la carga del techo), las cajas de plátano y
+  // el turril tienen la parte de arriba pisable, como las barricadas.
+  puesto_frutas: { ruta: OBJETOS_ALDEA },
+  mototaxi: { ruta: OBJETOS_ALDEA },
+  combi_vieja: { ruta: OBJETOS_ALDEA, solidos: [[22, 78, 3]] },
+  hamaca: { ruta: OBJETOS_ALDEA },
+  banca_mesa: { ruta: OBJETOS_ALDEA },
+  cajas_platano: { ruta: OBJETOS_ALDEA, solidos: [[9, 19, 18], [19, 56, 3], [56, 76, 17]] },
+  turril_lluvia: { ruta: OBJETOS_ALDEA, solidos: [[0, 37, 3]] },
+  tendedero: { ruta: OBJETOS_ALDEA },
+  letrero: { ruta: OBJETOS_ALDEA },
+  cerca: { ruta: OBJETOS_ALDEA },
+  // Campamento (objetos2.jpeg y objeto4.jpeg). Los grandes van detrás de
+  // todo (detras): asoman por encima de las barricadas y cosas bajas que
+  // tienen delante, sin tapar nada del juego.
+  atalaya: { ruta: OBJETOS_ALDEA, detras: true },
+  carpa: { ruta: OBJETOS_ALDEA, detras: true },
+  radio: { ruta: OBJETOS_ALDEA, detras: true },
+  jeep_quemado: { ruta: OBJETOS_ALDEA, detras: true },
+  galpon: { ruta: OBJETOS_ALDEA, detras: true },
+  galpon_roto: { ruta: OBJETOS_ALDEA, detras: true },
+  escombros: { ruta: OBJETOS_ALDEA },
+  reflector: { ruta: OBJETOS_ALDEA },
+  // Cobertura (objetos3.jpeg) y cajas (objeto4.jpeg): en el suelo, con la
+  // parte de arriba pisable, como las barricadas.
+  barricada_tablas: { ruta: OBJETOS_ALDEA, solidos: [[8, 72, 7]] },
+  sacos_bajo: { ruta: OBJETOS_ALDEA, solidos: [[10, 76, 3]] },
+  sacos_alto: { ruta: OBJETOS_ALDEA, solidos: [[8, 88, 4]] },
+  sacos_pila: { ruta: OBJETOS_ALDEA, solidos: [[8, 68, 4]] },
+  sacos_pila2: { ruta: OBJETOS_ALDEA, solidos: [[8, 54, 4]] },
+  turril_oxidado: { ruta: OBJETOS_ALDEA, solidos: [[0, 26, 2]] },
+  turril_tirado: { ruta: OBJETOS_ALDEA, solidos: [[3, 46, 2]] },
+  turril_tnt: { ruta: OBJETOS_ALDEA, solidos: [[0, 26, 2]] },
+  caja_madera: { ruta: OBJETOS_ALDEA, solidos: [[0, 42, 4]] },
+  caja_rota: { ruta: OBJETOS_ALDEA, solidos: [[0, 38, 4]] }
 };
 
 // Distribución por tramos (x = centro en el mundo). Variaciones para que las
@@ -267,25 +310,62 @@ const PROPS = {
 // agua); sin piso, la base se apoya en el suelo.
 const PROPS_NIVEL1 = [
   // Entrada (0-1800): primera cobertura y una torre con un enemigo arriba.
+  // Objetos de la aldea (OBJETOS_ALDEA) en los huecos libres: no detrás de
+  // las cajas de armas (W, 180 px de ancho y delante de todo), de los sacos
+  // (s) ni de las cajas (x), que los tapaban. El puesto de frutas detrás del
+  // NPC de la hamburguesa, una cerca junto a la barricada, un turril al pie
+  // de la torre, la mototaxi y un letrero antes del río.
+  { prop: 'jeep_quemado', x: 125 },     // detrás de la caja del inicio
+  { prop: 'caja_madera', x: 70 },
+  { prop: 'puesto_frutas', x: 300 },
+  { prop: 'galpon_roto', x: 500 },      // detrás del NPC y los sacos
+  { prop: 'turril_oxidado', x: 670 },
+  { prop: 'atalaya', x: 760 },          // asoma detrás de la barricada
   { prop: 'barricada_llantas_turriles', x: 760 },
+  { prop: 'cerca', x: 950, escala: 0.85 },
+  { prop: 'turril_lluvia', x: 1200 },
   { prop: 'torre_vigia', x: 1330, enemigo: true },
+  { prop: 'sacos_pila', x: 1330 },  // al pie de la torre
+  { prop: 'mototaxi', x: 1625 },
+  { prop: 'letrero', x: 1752, escala: 0.9, espejo: true },
   // Río (1800-3840): muelle apoyado en la orilla, choza sobre el agua, otro
   // muelle, la canoa y una choza con los pilotes en la orilla derecha.
   { prop: 'muelle', x: 1978, piso: 528 },
+  { prop: 'caja_madera', x: 1880, piso: 528 },     // carga sobre el muelle
+  { prop: 'turril_tirado', x: 2060, piso: 528 },
   { prop: 'choza_palafito', x: 2480, piso: 528, tinte: 0xe4e8d8 },
+  { prop: 'turril_oxidado', x: 2580, piso: 528 },  // en la terraza de la choza
   { prop: 'muelle', x: 2980, piso: 528, espejo: true, tinte: 0xe8e4dc },
+  { prop: 'sacos_bajo', x: 2980, piso: 528 },      // trinchera sobre el muelle
   { prop: 'canoa', x: 3290 },
   { prop: 'choza_palafito', x: 3560, espejo: true, escala: 1.05 },
   // Aldea (3840-6000): casa y chozas alternadas, barricada y una torre.
+  { prop: 'sacos_pila2', x: 4045 },
   { prop: 'casa_destruida', x: 4150 },
+  { prop: 'banca_mesa', x: 4262 },  // al costado de la casa (antes de los sacos)
   { prop: 'choza_palafito', x: 4620, espejo: true, escala: 0.95, tinte: 0xe0e6d4 },
+  { prop: 'hamaca', x: 4545 },      // colgada entre los pilotes de la choza
   { prop: 'casa_ladrillo', x: 5800, escala: 0.85 }, // más chica: entra entre el peñón y la barricada
+  { prop: 'turril_tnt', x: 5680 },
+  { prop: 'caja_rota', x: 5900 },
+  { prop: 'cajas_platano', x: 6080 }, // delante de la casa, a la derecha de la puerta
+  { prop: 'carpa', x: 6330 },           // asoma detrás de la barricada
   { prop: 'barricada_llantas_turriles', x: 6364, espejo: true, escala: 0.9 },
   // Campamento (6000-8192): torre, casa grande y dos barricadas.
   { prop: 'torre_vigia', x: 6664, espejo: true, enemigo: true },
+  { prop: 'sacos_alto', x: 6664 },  // trinchera al pie de la torre
+  { prop: 'reflector', x: 6790 },
   { prop: 'casa_destruida', x: 6984, espejo: true, escala: 1.1, tinte: 0xe8e2d8 },
+  { prop: 'radio', x: 7300 },           // la antena asoma detrás de la barricada
   { prop: 'barricada_llantas_turriles', x: 7334 },
   { prop: 'torre_vigia', x: 7634, escala: 0.9, tinte: 0xe4e8d8, enemigo: true },
+  { prop: 'barricada_tablas', x: 7634 },
+  // Antes del edificio del jefe (los sacos y la caja de armas empiezan en 8192).
+  { prop: 'combi_vieja', x: 7845 },
+  { prop: 'galpon', x: 8065 },          // detrás del tendedero
+  { prop: 'tendedero', x: 8065 },
+  { prop: 'caja_madera', x: 8530 },
+  { prop: 'escombros', x: 8700 },       // al pie del edificio del jefe
   // Final (8192-9216): el edificio del jefe.
   { prop: 'edif_final', x: 9088, escala: 0.7 }
 ];
@@ -353,7 +433,10 @@ const ENTRADA_CUEVA = {
   sonido: { alcance: 720, volumen: 0.5 }
 };
 
-const ESCALERA = { velocidad: 160 };
+// suelta: ms en que no se vuelve a agarrar después de soltarse de costado o
+// saltando (con ARRIBA apretado la volvía a agarrar enseguida: quedaba
+// trabado, trepando y soltándose cada cuadro, y parpadeaba).
+const ESCALERA = { velocidad: 160, suelta: 400 };
 
 // Sombras de contacto: elipse negra semitransparente pegada al suelo.
 const SOMBRA = { alfa: 0.35, alto: 6, jugador: 58, rehen: 78, cholita: 64, npcPower: 74, alturaMaxima: 260 };
@@ -396,6 +479,7 @@ class Nivel1 extends Phaser.Scene {
     this.load.spritesheet('npcRescate', 'assets/personajes/npc/rescate_sheet.png', celdaNpc);
     this.load.spritesheet('npcSale', 'assets/personajes/npc/saledepantalla_sheet.png', celdaNpc);
     cargarSoldados(this); // Soldados.js
+    cargarGarroteros(this); // Garroteros.js
     this.load.spritesheet('cholita', 'assets/personajes/enemigos/cholita_sheet.png', { frameWidth: CHOLITA.ancho, frameHeight: CHOLITA.alto });
     this.load.spritesheet('cholitaRip', 'assets/personajes/enemigos/cholita_rip_sheet.png', { frameWidth: CHOLITA.rip.ancho, frameHeight: CHOLITA.rip.alto });
     this.load.spritesheet('cholitaQuemada', 'assets/personajes/enemigos/cholita_quemada_sheet.png', { frameWidth: CHOLITA.quemada.ancho, frameHeight: CHOLITA.quemada.alto });
@@ -405,10 +489,12 @@ class Nivel1 extends Phaser.Scene {
     this.load.spritesheet('jugador', 'assets/personajes/jugador/1_sheet_calido.png', { frameWidth: 84, frameHeight: 84 });
     // Segundo jugador (herramientas/manfred_spritesheet.py).
     this.load.spritesheet('jugadorManfred', 'assets/personajes/jugador/manfred_sheet_calido.png', { frameWidth: 84, frameHeight: 84 });
-    cargarTuto(this); // Tuto: piernas, torso y cuerpo entero (CuerpoTuto.js)
+    cargarCuerpos(this); // Tuto: piernas, torso y cuerpo entero (CuerpoModular.js)
     // Entrada a la cueva (herramientas/entrada_cueva.py).
     ['cueva_back', 'cueva_front', 'cueva_tunel', 'cueva_hueco', 'cueva_colina', 'roca_1', 'roca_2', 'roca_3', 'roca_4'].forEach((n) => this.load.image('entrada_' + n, `assets/cueva/${n}.png`));
     this.load.json('entradaColision', 'assets/cueva/entrada_collision.json');
+    cargarEntradaHeli(this); // Cinematica.js: helicóptero y Manfred bajando por la soga
+    cargarIntroLancha(this); // IntroLevel.js: Tuto llega en lancha por el río
     // La barra espaciadora del cartel de mareado (Jugador.aturdirJugador).
     this.load.image('teclaEspacio', 'assets/mecanicas/espacio/espacio_tecla.png');
     cargarAves(this);  // guácharos de la boca de la cueva (Cueva.js)
@@ -433,6 +519,8 @@ class Nivel1 extends Phaser.Scene {
 
     this.crearTexturasProvisionales();
     this.crearParalaje();
+    this.indiceParalaje = this.children.list.length; // IntroLevel.js: sus capas van justo encima
+    this.introLancha = null;
 
     // Grupos de cuerpos estáticos.
     this.suelo = this.physics.add.staticGroup();       // piedra del mapa (S)
@@ -784,6 +872,21 @@ class Nivel1 extends Phaser.Scene {
     }
   }
 
+  // Lo de cada cuadro para algo que camina por el terreno (enemigos, NPC):
+  // frena contra los muros, se pega a la rampa o se asienta en la piedra al
+  // salir de ella. Guarda 'rampa' y 'xAnterior' y devuelve la rampa o null.
+  // Tiene que correr SIEMPRE que el cuerpo tenga física, también mientras
+  // ataca o dispara: en una rampa el suelo de piedra no choca con él (ver los
+  // colliders con this.suelo) y, sin esto, la gravedad lo hundía en la rampa
+  // y se caía del mapa.
+  seguirTerreno(sprite) {
+    if (sprite.getData('rampa')) this.frenarContraMuro(sprite, sprite.getData('xAnterior'));
+    const rampa = this.pegarARampa(sprite, true);
+    if (!rampa && sprite.getData('rampa')) this.asentarEnPiedra(sprite);
+    sprite.setData('rampa', rampa).setData('xAnterior', sprite.body.x);
+    return rampa;
+  }
+
   // ---------------------------------------------------------------------------
   // Plataformas de un solo sentido
   // ---------------------------------------------------------------------------
@@ -894,6 +997,7 @@ class Nivel1 extends Phaser.Scene {
       this.vencerCholita(c, x, !cuerpo);
     });
     this.soldadosEnArea(x, y, radio, cuerpo); // Soldados.js
+    this.garroterosEnArea(x, y, radio, cuerpo); // Garroteros.js
     this.cajasArmas.forEach((caja) => {
       if (!caja.active || Phaser.Math.Distance.Between(x, y, caja.x, caja.y - 40) > radio + 30) return;
       if (cuerpo) golpearCaja(this, caja);
@@ -1862,13 +1966,193 @@ class Nivel1 extends Phaser.Scene {
     cam.scrollY = Phaser.Math.Clamp(inicio.abajo - 60 - this.scale.height / 2 - CAMARA.bajarJugador, 0, this.altoNivel - this.scale.height);
   }
 
-  // Entrada estilo Metal Slug: llega caminando mientras aparece el cartel.
+  // Entrada estilo Metal Slug (Tuto y Manfred): entra de un salto desde fuera
+  // de la pantalla, cae en su lugar con polvo y temblor, queda agachado un
+  // instante, se para, dispara dos tiros al aire y recién ahí se puede mover.
   animacionEntrada() {
-    const { width } = this.scale;
-    this.jugador.setVelocityX(JUGADOR.velocidad * 0.8).play('jugador_caminar');
+    // Manfred, la primera vez: llega en helicóptero y baja por la soga.
+    if (personajeCuerpo(this) === 'manfred' && !this.reapareciendo && animacionesEntradaHeli(this)) {
+      this.entradaHelicoptero();
+      return;
+    }
+    // Tuto, la primera vez: llega en lancha por el río (IntroLevel.js).
+    if (personajeCuerpo(this) === 'tuto' && !this.reapareciendo && animacionesIntroLancha(this)) {
+      this.entradaLancha();
+      return;
+    }
+    const j = this.jugador;
+    const g = this.physics.world.gravity.y + JUGADOR.gravedad;
+    const pies = this.inicio.abajo - 30 * ESCALA; // y del sprite con los pies en el suelo
+    const alto = 260;                             // empieza tanto más arriba
+    const vy = -420;                              // y sale hacia arriba
+    // Tiempo de vuelo hasta los pies en el suelo: alto + vy·t ... = 0.
+    const t = (-vy + Math.sqrt(vy * vy + 2 * g * alto)) / g;
+    j.setPosition(-70, pies - alto).setFlipX(false);
+    j.body.reset(-70, pies - alto);
+    j.body.setAllowGravity(true);
+    j.setVelocity((this.inicio.x + 70) / t, vy);
+    this.aterrizoEntrada = false;
 
     // MISIÓN 1 letra por letra y ¡COMIENZA! (Estado.js); al reaparecer, no.
     if (!this.reapareciendo) comienzaMision(this, 'MISIÓN 1');
+  }
+
+  // Entrada de Manfred (después de Cinematica.js): el helicóptero entra desde
+  // la izquierda y frena sobre el inicio (el rotor levanta polvo), tira la
+  // soga, Manfred baja deslizándose, se suelta, cae agachado, se para y saluda.
+  // Mientras, el jugador de verdad espera invisible en el inicio
+  // (ocultarJugador: CuerpoModular no lo dibuja) y lo que se ve es su hoja
+  // de entrada (manfred_entrada.png). Después el helicóptero se va.
+  entradaHelicoptero() {
+    // derecha: cuánto más allá del inicio baja (así el helicóptero entra entero en la pantalla).
+    const H = { escala: 1.5, sobreSuelo: 255, llega: 1900, soga: 380, baja: 950, suelta: 62, derecha: 150, cae: 190, control: 2050 };
+    // Su sonido (Armas.js) termina justo cuando toma el control: empieza lo
+    // que dura antes. Desde que empieza la llegada, el control llega en:
+    // llega + soga + 120 (sale Manfred) + baja + cae + control.
+    const finLlegada = H.llega + H.soga + 120 + H.baja + H.cae + H.control;
+    this.time.delayedCall(Math.max(0, finLlegada - SFX_VARIOS.manfredLlega.dura * 1000), () => {
+      sonarSfxLargo(this, 'manfredLlega');
+      rotor.volumen(0.08, 0.4); // el rotor baja para que se escuche
+    });
+    const j = this.jugador;
+    const suelo = this.inicio.abajo;
+    const x = this.inicio.x + H.derecha;
+    this.aterrizoEntrada = true; // no es la entrada de un salto
+    this.ocultarJugador = true;
+    j.body.reset(x, suelo - 30 * ESCALA);
+    j.body.setAllowGravity(true);
+    j.setVelocity(0).setFlipX(false);
+
+    const heli = crearHelicoptero(this, x - 900, suelo - H.sobreSuelo - 120, H.escala).setDepth(10.8).setAngle(12);
+    const base = { x: heli.x, y: heli.y };
+    const rotor = sonidoHelicoptero(this, 0.22);
+    const soga = this.add.graphics().setDepth(10.7);
+    const cuerda = { largo: 0 };
+    let manfred = null;
+    let viento = null;
+
+    // Cada cuadro: el vaivén del helicóptero y la soga, de su extremo hacia abajo.
+    const seguir = (time) => {
+      heli.setPosition(base.x, base.y + Math.sin(time / 300) * 5);
+      soga.clear();
+      if (cuerda.largo <= 0) return;
+      const x0 = heli.x, y0 = heli.y - 4;
+      soga.lineStyle(7, 0x3a2812, 1).lineBetween(x0, y0, x0, y0 + cuerda.largo);
+      soga.lineStyle(4, 0xb08850, 1).lineBetween(x0, y0, x0, y0 + cuerda.largo);
+      soga.lineStyle(2, 0x7a5a2c, 1);
+      for (let y = y0 + 4; y < y0 + cuerda.largo - 4; y += 8) soga.lineBetween(x0 - 2, y, x0 + 2, y + 4);
+      // Colgado de la soga, Manfred se mece con el helicóptero.
+      if (manfred && manfred.getData('soga')) manfred.x = x0;
+    };
+    this.events.on('update', seguir);
+
+    // 1. Llega y frena (levanta la nariz al frenar).
+    this.tweens.add({ targets: base, x, y: suelo - H.sobreSuelo, duration: H.llega, ease: 'Cubic.out' });
+    this.tweens.chain({
+      targets: heli,
+      tweens: [
+        { angle: -7, duration: H.llega * 0.75, ease: 'Sine.inOut' },
+        { angle: 0, duration: 500, ease: 'Sine.out' }
+      ]
+    });
+    // El viento del rotor levanta polvo del piso.
+    this.time.delayedCall(H.llega * 0.55, () => {
+      viento = this.add.particles(x, suelo - 4, 'fx_humo', {
+        speedX: { min: -260, max: 260 }, speedY: { min: -40, max: -4 }, lifespan: 650, frequency: 45,
+        scale: { start: 1.4, end: 3.6 }, alpha: { start: 0.35, end: 0 }, tint: 0xcbb898
+      }).setDepth(10.9);
+    });
+
+    // 2. Tira la soga hasta el piso.
+    this.time.delayedCall(H.llega, () => {
+      this.tweens.add({ targets: cuerda, largo: H.sobreSuelo - 2, duration: H.soga, ease: 'Quad.in' });
+    });
+
+    // 3. Baja Manfred por la soga (detrás del helicóptero hasta que asoma).
+    this.time.delayedCall(H.llega + H.soga + 120, () => {
+      manfred = this.add.sprite(heli.x, heli.y + 40, 'manfredEntrada', 0).setOrigin(0.5, 1).setDepth(10.75)
+        .setData('soga', true).play('manfred_soga');
+      this.tweens.add({
+        targets: manfred, y: suelo - H.suelta, duration: H.baja, ease: 'Quad.in',
+        onComplete: () => {
+          // 4. Se suelta y cae.
+          manfred.setData('soga', false).anims.stop();
+          manfred.setFrame(2);
+          this.tweens.add({ targets: manfred, y: suelo, duration: H.cae, ease: 'Quad.in', onComplete: aterriza });
+        }
+      });
+    });
+
+    // 5. Cae agachado: polvo, temblor y golpe; se para, saluda y el
+    // helicóptero recoge la soga y se va.
+    const aterriza = () => {
+      manfred.setFrame(3);
+      this.cameras.main.shake(170, 0.007);
+      sonidoUI(this, 'golpe');
+      const humo = this.add.particles(x, suelo - 6, 'fx_humo', {
+        speedX: { min: -180, max: 180 }, speedY: { min: -60, max: -5 }, lifespan: 700,
+        scale: { start: 2, end: 5 }, alpha: { start: 0.6, end: 0 }, tint: 0xc8b090, emitting: false
+      }).setDepth(11);
+      humo.explode(18);
+      this.time.delayedCall(800, () => humo.destroy());
+      this.tweens.add({ targets: cuerda, largo: 0, duration: 420, delay: 250, ease: 'Quad.in' });
+      this.time.delayedCall(420, () => manfred.setFrame(4));
+      this.time.delayedCall(720, () => {
+        manfred.setFrame(5); // saludo
+        // Luces del final: el fondo se hace sombra y él queda iluminado y reluciente (Luces.js).
+        manfred.setDepth(11.2);
+        momentoHeroe(this, manfred, { dura: 1050, profundidad: 11 });
+        if (!this.reapareciendo) comienzaMision(this, 'MISIÓN 1');
+        // El helicóptero se va: inclina la nariz y acelera hacia arriba a la derecha.
+        this.tweens.add({ targets: heli, angle: 14, duration: 600, ease: 'Sine.inOut' });
+        this.tweens.add({
+          targets: base, x: x + 1300, y: suelo - H.sobreSuelo - 260, duration: 2200, ease: 'Quad.in',
+          onComplete: () => { this.events.off('update', seguir); heli.destroy(); soga.destroy(); }
+        });
+        rotor.parar(2.2);
+        if (viento) { viento.stop(); this.time.delayedCall(800, () => viento.destroy()); }
+      });
+      // 6. Toma el control (después de las luces).
+      this.time.delayedCall(H.control, () => {
+        manfred.destroy();
+        this.ocultarJugador = false;
+        this.terminarEntrada();
+      });
+    };
+    this.events.once('shutdown', () => this.events.off('update', seguir));
+  }
+
+  // Cae en su lugar: polvo, temblor y la pose antes de tomar el control.
+  aterrizarEntrada() {
+    this.aterrizoEntrada = true;
+    const j = this.jugador;
+    j.setVelocity(0);
+    const abajo = j.body.bottom;
+    this.cameras.main.shake(160, 0.006);
+    const humo = this.add.particles(j.x, abajo - 6, 'fx_humo', {
+      speedX: { min: -170, max: 170 }, speedY: { min: -60, max: -5 }, lifespan: 700,
+      scale: { start: 2, end: 5 }, alpha: { start: 0.6, end: 0 }, tint: 0xc8b090, emitting: false
+    }).setDepth(11);
+    humo.explode(16);
+    this.time.delayedCall(800, () => humo.destroy());
+    // Agachado por el golpe del aterrizaje...
+    this.posturaJugador(true, false, true);
+    this.time.delayedCall(380, () => {
+      // ...se para y apunta arriba: dos tiros al aire, con las luces del final
+      // (el cuerpo son varias partes: se ilumina el lugar, sin brillo en el sprite).
+      momentoHeroe(this, { x: j.x, y: j.body.bottom, depth: 10, displayHeight: 125, displayWidth: 60 },
+        { dura: 560, brillo: false, estrellas: 5 });
+      this.posturaJugador(true, true, false);
+      this.apuntaDiagonal = false;
+      this.apuntaArriba = !!this.cuadrosJugador.ataqueArriba;
+      // (un cuadro después: la mano ya está arriba y de ahí salen las balas)
+      this.time.delayedCall(60, () => this.disparar());
+      this.time.delayedCall(230, () => this.disparar());
+      this.time.delayedCall(620, () => {
+        this.apuntaArriba = false;
+        this.terminarEntrada();
+      });
+    });
   }
 
   terminarEntrada() {
@@ -1954,6 +2238,7 @@ class Nivel1 extends Phaser.Scene {
       this.bajandoHasta = this.time.now + 250;
     } else if (saltar && enSuelo && !this.saltoPresionado) {
       j.setVelocityY(-JUGADOR.salto * (rio ? RIO.salto : 1));
+      sonarSfx(this, 'salto'); // Armas.js
       this.rampaActual = null;
       if (rio) this.salpicaduras.explode(14, j.x, rio.superficie);
     }
@@ -2015,7 +2300,8 @@ class Nivel1 extends Phaser.Scene {
       // Base: a la altura pedida del piso, flotando, o sobre el suelo más alto.
       let base;
       const rio = this.rios.find((r) => pos.x >= r.ax0 && pos.x < r.ax1);
-      if (pos.piso !== undefined) base = pos.piso + (fuente.height - datos.pisos[0][2]) * s;
+      // Con piso y sin pisos propios (un turril sobre un muelle): la base va en ese piso.
+      if (pos.piso !== undefined) base = pos.piso + (datos.pisos ? (fuente.height - datos.pisos[0][2]) * s : HUNDIDO);
       else if (datos.flota && rio) base = rio.superficie + alto * 0.45;
       else base = Math.min(...pilotes.map(([a, b]) => this.sueloBajo((a + b) / 2))) + HUNDIDO;
       // Si el prop marca su fila de base, lo que hay debajo (escombros) queda
@@ -2084,7 +2370,16 @@ class Nivel1 extends Phaser.Scene {
       ...this.posiciones('E').map(({ x, abajo }) => ({ x, abajo })),
       ...this.puestosEnemigo.map(({ x, y }) => ({ x, abajo: y, torre: true }))
     ]);
+    this.crearGarroteros(this.posiciones('G')); // Garroteros.js
     this.crearCholitas();
+  }
+
+  // Colisiones de los enemigos de a pie (Soldados.js, Garroteros.js): la
+  // piedra (no en las rampas), los obstáculos y las pasarelas desde arriba.
+  colisionesEnemigos(grupo) {
+    this.physics.add.collider(grupo, this.suelo, null, (o) => !o.getData('rampa'));
+    this.physics.add.collider(grupo, this.obstaculos);
+    this.physics.add.collider(grupo, this.pasarelas, null, (o, tramo) => this.puedePisar(o, tramo));
   }
 
   // ---------------------------------------------------------------------------
@@ -2161,12 +2456,11 @@ class Nivel1 extends Phaser.Scene {
   moverCholitas() {
     const j = this.jugador;
     this.cholitas.getChildren().forEach((c) => {
-      if (c.getData('estado') !== 'ronda') return;
+      const estado = c.getData('estado');
+      if (estado !== 'ronda' && estado !== 'ataque') return;
       const cuerpo = c.body;
-      if (c.getData('rampa')) this.frenarContraMuro(c, c.getData('xAnterior'));
-      const rampa = this.pegarARampa(c, true);
-      if (!rampa && c.getData('rampa')) this.asentarEnPiedra(c);
-      c.setData('rampa', rampa).setData('xAnterior', cuerpo.x);
+      const rampa = this.seguirTerreno(c); // también atacando (si no, se hunde en la rampa)
+      if (estado !== 'ronda') return;
 
       const origen = c.getData('origen');
       let direccion = c.getData('direccion');
@@ -2263,6 +2557,7 @@ class Nivel1 extends Phaser.Scene {
   // gritando y queda hecha ceniza; si no, cae con sangre.
   vencerCholita(c, desdeX = this.jugador.x, fuego = false) {
     c.setData('estado', 'vencida');
+    sonarSfx(this, 'muerteNpc'); // Armas.js
     sumarPuntos(this, 100);
     c.body.enable = false;
     c.anims.timeScale = 1;
@@ -2286,6 +2581,7 @@ class Nivel1 extends Phaser.Scene {
   }
 
   escaleraEn(sprite) {
+    if (!this.trepando && this.time.now < (this.sueltaEscaleraHasta || 0)) return null;
     const b = sprite.body;
     return this.escaleras.find((e) => b.center.x > e.x0 - 8 && b.center.x < e.x1 + 8 &&
       b.bottom > e.arriba - 14 && b.bottom < e.abajo + 6) || null;
@@ -2317,9 +2613,11 @@ class Nivel1 extends Phaser.Scene {
 
     if (espacio && !this.saltoPresionado) {
       terminar();
+      this.sueltaEscaleraHasta = this.time.now + ESCALERA.suelta;
       j.setVelocityY(-JUGADOR.salto * 0.7);
     } else if (costado) {
       terminar();
+      this.sueltaEscaleraHasta = this.time.now + ESCALERA.suelta;
     } else if (arriba && j.body.bottom <= e.arriba + 2) {
       j.body.y += e.arriba - j.body.bottom; // llegó: se para sobre el piso
       j.setVelocityY(0);
@@ -2506,10 +2804,7 @@ class Nivel1 extends Phaser.Scene {
   correrFuera(npc, velocidad) {
     const cam = this.cameras.main;
     const cuerpo = npc.body;
-    if (npc.getData('rampa')) this.frenarContraMuro(npc, npc.getData('xAnterior'));
-    const rampa = this.pegarARampa(npc, true);
-    if (!rampa && npc.getData('rampa')) this.asentarEnPiedra(npc);
-    npc.setData('rampa', rampa).setData('xAnterior', cuerpo.x);
+    const rampa = this.seguirTerreno(npc);
     const enSuelo = cuerpo.blocked.down || cuerpo.touching.down || !!rampa;
     const trabado = velocidad < 0 ? cuerpo.blocked.left || cuerpo.touching.left : cuerpo.blocked.right || cuerpo.touching.right;
     if (enSuelo && trabado) cuerpo.setVelocityY(-JUGADOR.salto * 0.8);
@@ -2537,7 +2832,7 @@ class Nivel1 extends Phaser.Scene {
 
     this.npcsPower = this.physics.add.group({ allowGravity: true });
     this.posiciones('N').forEach(({ x, abajo }) => {
-      const npc = this.npcsPower.create(x, abajo - 10, 'npcPower', 0).setOrigin(0.5, 1).setScale(ESCALA).setDepth(9.5);
+      const npc = this.npcsPower.create(x, abajo - 10, 'npcPower', 0).setOrigin(0.5, 1).setScale(NPC_POWER.escala).setDepth(9.5);
       npc.body.setSize(NPC_POWER.cuerpo.ancho, NPC_POWER.cuerpo.alto)
         .setOffset((NPC_POWER.ancho - NPC_POWER.cuerpo.ancho) / 2, NPC_POWER.alto - NPC_POWER.cuerpo.alto);
       npc.setData('estado', 'espera');
@@ -2552,13 +2847,18 @@ class Nivel1 extends Phaser.Scene {
   }
 
   // Esperando: saluda con la mano mientras el jugador está cerca y lo mira.
-  // Yéndose: corre hacia la derecha.
+  // Yéndose: corre hacia la derecha (si sale de la pantalla antes del puf,
+  // correrFuera lo borra).
   moverNpcsPower() {
     const j = this.jugador;
     this.npcsPower.getChildren().forEach((npc) => {
       const estado = npc.getData('estado');
       if (estado === 'sale') {
         this.correrFuera(npc, NPC_POWER.velocidadHuida);
+        if (npc.active && npc.body.blocked.down && this.time.now > (npc.getData('polvo') || 0)) {
+          npc.setData('polvo', this.time.now + NPC_POWER.polvo);
+          this.polvoPasos(npc.x - 18, npc.body.bottom);
+        }
         return;
       }
       if (estado !== 'espera') return;
@@ -2571,7 +2871,7 @@ class Nivel1 extends Phaser.Scene {
   }
 
   // Al tocarlo: entrega la hamburguesa (suma un power-up), festeja con un
-  // salto, hace la venia y desaparece (puf: humo y destello).
+  // salto, hace la venia, sale corriendo y desaparece (puf: humo y destello).
   recibirHamburguesa(npc) {
     if (npc.getData('estado') !== 'espera') return;
     npc.setData('estado', 'entrega');
@@ -2586,7 +2886,7 @@ class Nivel1 extends Phaser.Scene {
       sumarPuntos(this, PARTIDA.puntosPowerup);
       this.actualizarHUD();
       this.curarJugador(VIDA.hamburguesa); // media barra de vida (Jugador.js)
-      this.aviso(npc.x, npc.y - NPC_POWER.alto * ESCALA, '¡HAMBURGUESA! +MEDIA VIDA', 'oro');
+      this.aviso(npc.x, npc.y - NPC_POWER.alto * NPC_POWER.escala, '¡HAMBURGUESA! +MEDIA VIDA', 'oro');
       this.cameras.main.flash(120, 255, 200, 120);
     });
     npc.once('animationcomplete', () => {
@@ -2600,27 +2900,59 @@ class Nivel1 extends Phaser.Scene {
         npc.play('power_venia');
         npc.once('animationcomplete', () => {
           if (!npc.active) return;
-          this.desaparecerNpc(npc);
+          // Los cuadros de correr miran a la derecha.
+          npc.setFlipX(false).play('power_corre');
+          npc.setData({ estado: 'sale', desde: this.time.now, xAnterior: npc.body.x, rampa: null });
+          this.time.delayedCall(NPC_POWER.carrera, () => {
+            if (npc.active && npc.getData('estado') === 'sale') this.desaparecerNpc(npc);
+          });
         });
       });
     });
   }
 
-  // Puf: nube de humo, destello y se achica hasta desaparecer.
+  // Nubecita de polvo detrás de los pies al correr.
+  polvoPasos(x, y) {
+    const polvo = this.add.particles(x, y - 4, 'fx_polvo', {
+      speedX: { min: -70, max: -20 }, speedY: { min: -40, max: -10 }, lifespan: 380,
+      scale: { start: 1.2, end: 2.6 }, alpha: { start: 0.7, end: 0 }, emitting: false
+    }).setDepth(9.4);
+    polvo.explode(3);
+    this.time.delayedCall(420, () => polvo.destroy());
+  }
+
+  // Puf: destello blanco, se estira hacia arriba y se cierra como un resorte
+  // mientras sale una nube de humo con chispas.
   desaparecerNpc(npc) {
     npc.setData('estado', 'desaparece');
+    npc.anims.stop();
     npc.body.enable = false;
+    const e = NPC_POWER.escala;
     const x = npc.x;
-    const y = npc.y - NPC_POWER.alto * ESCALA * 0.45;
-    const humo = this.add.particles(x, y, 'fx_humo', {
-      speed: { min: 30, max: 110 }, lifespan: 650, scale: { start: 2.5, end: 5 },
-      alpha: { start: 0.7, end: 0 }, tint: 0xe8e4d8, emitting: false
+    const y = npc.y - NPC_POWER.alto * e * 0.45;
+    npc.setTintFill(0xffffff);
+    this.time.delayedCall(70, () => npc.active && npc.clearTint());
+    // Nube: un anillo rápido y humo que sube despacio.
+    const anillo = this.add.particles(x, y, 'fx_puf', {
+      speed: { min: 60, max: 170 }, lifespan: 520, scale: { start: 2.2, end: 4.5 },
+      alpha: { start: 0.9, end: 0 }, emitting: false
+    }).setDepth(9.7);
+    anillo.explode(18);
+    const nube = this.add.particles(x, y + 10, 'fx_puf', {
+      x: { min: -26, max: 26 }, y: { min: -40, max: 30 }, speedY: { min: -60, max: -20 }, speedX: { min: -20, max: 20 },
+      lifespan: 900, scale: { start: 3, end: 6 }, alpha: { start: 0.85, end: 0 }, emitting: false
     }).setDepth(9.6);
-    humo.explode(14);
-    this.time.delayedCall(700, () => humo.destroy());
-    chispas(this, x, y, 12, -90, 360, 9.7);
-    this.tweens.add({
-      targets: npc, scaleX: 0, scaleY: ESCALA * 1.3, alpha: 0, duration: 220, ease: 'Back.in',
+    nube.explode(12);
+    this.time.delayedCall(950, () => { anillo.destroy(); nube.destroy(); });
+    chispas(this, x, y, 14, -90, 360, 9.8);
+    this.cameras.main.shake(80, 0.002);
+    // Se estira un instante y se cierra hasta desaparecer.
+    this.tweens.chain({
+      targets: npc,
+      tweens: [
+        { scaleX: e * 0.7, scaleY: e * 1.25, duration: 90, ease: 'Quad.out' },
+        { scaleX: 0, scaleY: e * 1.5, y: npc.y - 14, alpha: 0, duration: 200, ease: 'Back.in' }
+      ],
       onComplete: () => npc.destroy()
     });
   }
@@ -2664,12 +2996,13 @@ class Nivel1 extends Phaser.Scene {
     if (admin) {
       this.cameras.main.setBounds(0, 0, this.anchoNivel, this.altoNivel);
       this.ladoPenon = null;
-    } else {
-      this.limitarCamaraPenon();
+    } else if (!this.introLancha || this.introLancha.fase >= 4) {
+      this.limitarCamaraPenon(); // no durante la lancha: la cámara está sobre el río (x < 0)
     }
     this.animarRios(delta);
     this.actualizarParalaje();
-    this.actualizarSombra(this.sombraJugador, this.jugador);
+    if (this.ocultarJugador) this.sombraJugador.setVisible(false); // entrada en helicóptero
+    else this.actualizarSombra(this.sombraJugador, this.jugador);
     this.rehenes.getChildren().forEach((r) => this.actualizarSombra(r.getData('sombra'), r));
     this.cholitas.getChildren().forEach((c) => {
       if (c.getData('estado') !== 'vencida') this.actualizarSombra(c.getData('sombra'), c);
@@ -2678,8 +3011,10 @@ class Nivel1 extends Phaser.Scene {
 
     const j = this.jugador;
     // La entrada termina al llegar a su lugar o si algo le corta el paso.
-    if (this.estado === 'entrada' && (j.x >= this.inicio.x || j.body.blocked.right || j.body.touching.right)) {
-      this.terminarEntrada();
+    // La entrada (un salto) termina al caer al suelo.
+    if (this.estado === 'entrada' && !this.aterrizoEntrada && j.body.velocity.y >= 0 &&
+        (j.body.blocked.down || j.body.touching.down)) {
+      this.aterrizarEntrada();
     }
     if (this.estado === 'control' && !admin) this.moverJugador();
     else if (!admin) cerrarSelector(this, false); // si el jugador deja de moverse (meta, puerta), sin cámara lenta
@@ -2687,6 +3022,7 @@ class Nivel1 extends Phaser.Scene {
     this.moverRehenes();
     this.moverCholitas();
     this.moverSoldados(); // Soldados.js
+    this.moverGarroteros(); // Garroteros.js
     this.moverNpcsPower();
     this.moverBalas();
   }

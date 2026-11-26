@@ -53,6 +53,8 @@ const INTRO = { fondo: 1000, condor: 1100, bolivia: 2100, slug: 2650, aguayo: 31
 
 const OPCIONES_MENU = [
   { texto: 'INICIAR MISIÓN', accion: 'jugar' },
+  { texto: 'ARENA', accion: 'arena' },
+  { texto: 'MULTIJUGADOR', accion: 'multijugador' },
   { texto: 'CONTROLES', accion: 'controles' }
 ];
 
@@ -472,9 +474,9 @@ class Menu extends Phaser.Scene {
   // flecha que parpadea a la izquierda.
   crearOpciones() {
     const { width, height } = this.scale;
-    const y0 = height * 0.74;
+    const y0 = height * 0.625; // (4 opciones)
     this.textos = OPCIONES_MENU.map((op, i) => {
-      const y = y0 + i * 46;
+      const y = y0 + i * 42;
       const placa = this.add.rectangle(width / 2, y, 360, 38, 0x14120c, 0.75).setStrokeStyle(2, 0x5a5e50).setDepth(45).setAlpha(0);
       const texto = TextFX.menu(this, width / 2, y, op.texto).setDepth(46).setAlpha(0);
       // Entran deslizándose desde los costados.
@@ -547,10 +549,27 @@ class Menu extends Phaser.Scene {
       });
     }
     this.cameras.main.shake(120, 0.006);
+    const accion = OPCIONES_MENU[this.opcion].accion;
+    if (accion === 'multijugador' || accion === 'arena') {
+      // Lobby (Red.js): crear o unirse a una sala. Al empezar, el anfitrión
+      // lleva a todos al selector de personaje. En ARENA (Arena.js) además
+      // se puede jugar solo contra bots.
+      this.listo = false;
+      LOBBY.abrir(() => { this.listo = true; }, accion === 'arena'
+        ? { modo: 'arena', alBots: (nombre) => { this.registry.set('nombreJugador', nombre || 'J1'); this.empezar('arena'); } }
+        : { modo: 'campana' });
+      return;
+    }
     if (OPCIONES_MENU[this.opcion].accion === 'controles') {
       this.abrirPanel();
       return;
     }
+    this.empezar('campana');
+  }
+
+  // Al selector de personaje; después, a la campaña o a la arena (registry 'modo').
+  empezar(modo) {
+    this.registry.set('modo', modo);
     this.listo = false;
     this.cameras.main.flash(150, 255, 240, 200);
     // Después del destello (3 x 140 ms).

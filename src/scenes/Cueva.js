@@ -17,8 +17,8 @@
 // abre el editor para verlas, moverlas y guardar el JSON (ver EDITOR).
 //
 // Recorrido (como en Metal Slug): 3 zonas. La cámara se traba al llegar a
-// cada una hasta vencer a sus enemigos (cholitas en el piso y en las alturas,
-// guácharos que bajan en picada); después parpadea "GO →". La tercera es la
+// cada una hasta vencer a sus enemigos (soldados y garroteros en el piso y en
+// las alturas, guácharos que bajan en picada); después parpadea "GO →". La tercera es la
 // arena del GUÁCHARO REY. Hay 2 rehenes; las cajas y los turriles se rompen a
 // balazos y sueltan un power-up al azar (un arma o un plátano que cura).
 // =============================================================================
@@ -46,12 +46,14 @@ const CUEVA = {
     { limite: 1040, guacharos: 3 },
     { limite: 1540, jefe: true }
   ],
-  // Enemigos de a pie: x, zona y desde qué y buscar el piso (para pararlas en
-  // una repisa en vez del suelo).
-  cholitas: [
-    { x: 430, zona: 0 }, { x: 760, zona: 0 }, { x: 980, zona: 0, desde: 330 },
-    { x: 1150, zona: 1 }, { x: 1320, zona: 1 }, { x: 1260, zona: 1, desde: 300 }, { x: 1420, zona: 1, desde: 300 },
-    { x: 1640, zona: 2 }, { x: 1830, zona: 2 }, { x: 2010, zona: 2 }
+  // Enemigos de a pie: tipo (soldado: Soldados.js, el enemigo1 que dispara;
+  // garrotero: Garroteros.js, el enemigo2 del garrote), x, zona y desde qué y
+  // buscar el piso (para pararlos en una repisa en vez del suelo).
+  enemigos: [
+    { tipo: 'garrotero', x: 430, zona: 0 }, { tipo: 'soldado', x: 760, zona: 0 }, { tipo: 'soldado', x: 980, zona: 0, desde: 330 },
+    { tipo: 'garrotero', x: 1150, zona: 1 }, { tipo: 'garrotero', x: 1320, zona: 1 },
+    { tipo: 'soldado', x: 1260, zona: 1, desde: 300 }, { tipo: 'soldado', x: 1420, zona: 1, desde: 300 },
+    { tipo: 'garrotero', x: 1640, zona: 2 }, { tipo: 'soldado', x: 1830, zona: 2 }, { tipo: 'garrotero', x: 2010, zona: 2 }
   ],
   rehenes: [{ x: 615, desde: 360 }, { x: 1120, desde: 300 }],
   // Rompibles (se pisan desde arriba). pila: cajas una arriba de la otra.
@@ -108,17 +110,23 @@ const CUEVA = {
 // Editor de colisión (tecla E). Colores por tipo.
 const EDITOR = {
   colores: { ground: 0x5aff6a, platforms: 0x40d8ff, walls: 0xff4a4a, ladders: 0xffd23f },
-  agarre: 10 // px de distancia para tomar un punto
+  agarre: 10, // px de distancia para tomar un punto
+  // Piezas que son cajas (x, y, w, h) y las que van de arriba a abajo (x0,
+  // x1, arriba, abajo). grietas y ascensores: los túneles de la mina (Tuneles.js).
+  cajas: ['walls', 'grietas'],
+  tramos: ['ladders', 'ascensores']
 };
 
 class Cueva extends Phaser.Scene {
-  constructor() {
-    super('Cueva');
+  // clave: Nivel2 (Potosí) hereda de la Cueva con su propia clave.
+  constructor(clave = 'Cueva') {
+    super(clave);
   }
 
   preload() {
     // Arrancando directo (index.html?escena=Cueva) falta lo que carga Nivel1.
-    if (!this.textures.exists('cholita')) Nivel1.prototype.preload.call(this);
+    if (!this.textures.exists('enemigo2')) Nivel1.prototype.preload.call(this);
+    cargarSfxArmas(this); // Armas.js (solo lo que falta)
     const r = CUEVA.ruta;
     cargarAves(this, true);
     if (!this.textures.exists('cuevaNivel')) this.load.image('cuevaNivel', r + 'cueva.png');
@@ -395,7 +403,7 @@ class Cueva extends Phaser.Scene {
     return personaje.body.velocity.y >= 0 && pies <= tramo.body.top + 10;
   }
 
-  // Colisiones de algo que camina o cae (cholitas, rehenes, premios).
+  // Colisiones de algo que camina o cae (enemigos, rehenes, premios).
   pisar(objetos) {
     this.physics.add.collider(objetos, this.solidos);
     this.physics.add.collider(objetos, [this.plataformas, this.rompibles], null, (o, t) => this.puedePisar(o, t));
@@ -465,7 +473,7 @@ class Cueva extends Phaser.Scene {
     if (direccion) j.setFlipX(direccion < 0);
     // ABAJO sobre una repisa: se deja caer a través.
     if (abajo && sobrePlataforma) this.bajandoHasta = this.time.now + 250;
-    else if (saltar && enSuelo && !this.saltoPresionado) j.setVelocityY(-JUGADOR.salto);
+    else if (saltar && enSuelo && !this.saltoPresionado) { j.setVelocityY(-JUGADOR.salto); sonarSfx(this, 'salto'); }
     this.saltoPresionado = saltar;
 
     if (dispara && this.time.now >= this.proximoDisparo) this.disparar();
@@ -677,44 +685,24 @@ class Cueva extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------------
-  // Enemigos: cholitas (Nivel1) y guácharos
+  // Enemigos: soldados (enemigo1), garroteros (enemigo2) y guácharos
   // ---------------------------------------------------------------------------
 
   crearEnemigos() {
-    this.crearAnimacionesCholita();
-    this.cholitas = this.physics.add.group({ allowGravity: true });
-    const polleras = Phaser.Utils.Array.Shuffle([...CHOLITA.polleras]);
-    CUEVA.cholitas.forEach(({ x, zona, desde = 470 }, i) => {
+    const posiciones = { soldado: [], garrotero: [] };
+    CUEVA.enemigos.forEach(({ tipo, x, zona, desde = 470 }) => {
       const s = this.superficie(x, desde);
-      // Su ronda no sale de lo que se ve con la cámara trabada en su zona: si
-      // no, una cholita fuera de la pantalla no dejaba avanzar.
+      // Su ronda no sale de lo que se ve con la cámara trabada en su zona (si
+      // no, uno fuera de la pantalla no dejaba avanzar) ni de su piso.
       const limite = Math.min(CUEVA.zonas[zona].limite, CUEVA.ancho - this.scale.width);
       const vista = [limite + 50, limite + this.scale.width - 50];
-      const pollera = polleras[i % polleras.length];
-      const c = this.cholitas.create(x, s.y - 4, 'cholita', 0).setOrigin(0.5, 1).setScale(ESCALA).setDepth(9.6);
-      c.body.setSize(CHOLITA.cuerpo.ancho, CHOLITA.cuerpo.alto)
-        .setOffset((CHOLITA.ancho - CHOLITA.cuerpo.ancho) / 2, CHOLITA.alto - CHOLITA.cuerpo.alto);
-      // Su ronda no pasa de los bordes del piso en el que está.
-      c.setData({
-        estado: 'ronda', pollera, zona, origen: x, direccion: Phaser.Math.RND.sign(), atacaDesde: 0,
-        min: Math.max(s.x0 + 18, x - CHOLITA.ronda, vista[0]), max: Math.min(s.x1 - 18, x + CHOLITA.ronda, vista[1])
+      posiciones[tipo].push({
+        x, abajo: s.y, zona,
+        min: Math.max(s.x0 + 18, x - 170, vista[0]), max: Math.min(s.x1 - 18, x + 170, vista[1])
       });
-      const sombra = this.crearSombra(SOMBRA.cholita, 9.3);
-      c.setData('sombra', sombra);
-      c.once('destroy', () => sombra.destroy());
-      c.play({ key: `cholita_${pollera}`, startFrame: Phaser.Math.Between(0, CHOLITA.caminar - 1) });
     });
-    this.pisar(this.cholitas);
-    this.physics.add.overlap(this.jugador, this.cholitas, (j, c) => this.chocarCholita(c));
-    this.physics.add.overlap(this.balas, this.cholitas, (bala, c) => {
-      const estado = c.getData('estado');
-      if (estado !== 'ronda' && estado !== 'ataque') return;
-      if (this.impactoBala(bala)) return;
-      const fuego = bala.getData('tipo') === 'llama';
-      if (!fuego) sangrar(this, bala.x, bala.y, bala.body.velocity.x < 0 ? -1 : 1);
-      bala.destroy();
-      this.vencerCholita(c, bala.x, fuego);
-    });
+    this.crearSoldados(posiciones.soldado);       // Soldados.js
+    this.crearGarroteros(posiciones.garrotero);   // Garroteros.js
 
     // Guácharos: vuelan bajo el techo y bajan en picada.
     this.guacharos = this.physics.add.group({ allowGravity: false });
@@ -738,54 +726,6 @@ class Cueva extends Phaser.Scene {
     this.ondas = this.physics.add.group({ allowGravity: false });
     this.physics.add.overlap(this.jugador, this.ondas, (j, o) => {
       if (this.golpearJugador(o.x) || this.muerto) o.destroy();
-    });
-  }
-
-  // Las animaciones de las cholitas (las crea Nivel1; acá por si se arranca directo).
-  crearAnimacionesCholita() {
-    const porFila = CHOLITA.caminar + CHOLITA.ataque;
-    CHOLITA.polleras.forEach((pollera, fila) => {
-      if (this.anims.exists(`cholita_${pollera}`)) return;
-      const inicio = fila * porFila;
-      const rango = (clave, start, end) => this.anims.generateFrameNumbers(clave, { start, end });
-      this.anims.create({ key: `cholita_${pollera}`, frames: rango('cholita', inicio, inicio + CHOLITA.caminar - 1), frameRate: 10, repeat: -1 });
-      this.anims.create({ key: `cholita_ataque_${pollera}`, frames: rango('cholita', inicio + CHOLITA.caminar, inicio + porFila - 1), frameRate: 11 });
-      const rip = fila * CHOLITA.rip.cuadros;
-      this.anims.create({ key: `cholita_rip_${pollera}`, frames: rango('cholitaRip', rip, rip + CHOLITA.rip.cuadros - 1), frameRate: 9 });
-      const q = fila * CHOLITA.quemada.cuadros;
-      this.anims.create({
-        key: `cholita_quemada_${pollera}`, frameRate: 8,
-        frames: this.anims.generateFrameNumbers('cholitaQuemada', { frames: CHOLITA.quemada.secuencia.map((k) => q + k) })
-      });
-    });
-  }
-
-  // Ronda dentro de su piso; si ve al jugador lo corre y de cerca le pega
-  // (atacarCholita de Nivel1). En el borde se planta: no se tira.
-  moverCholitas() {
-    const j = this.jugador;
-    this.cholitas.getChildren().forEach((c) => {
-      if (c.getData('estado') !== 'ronda') return;
-      const cuerpo = c.body;
-      const dx = j.body.center.x - cuerpo.center.x;
-      const ve = this.estado === 'control' && Math.abs(dx) < CHOLITA.vista && Math.abs(j.body.bottom - cuerpo.bottom) < CHOLITA.vistaAlto;
-      const enSuelo = cuerpo.blocked.down || cuerpo.touching.down;
-      if (ve && enSuelo && Math.abs(dx) < CHOLITA.alcance && this.time.now > c.getData('atacaDesde')) {
-        this.atacarCholita(c, Math.sign(dx) || 1);
-        return;
-      }
-      let direccion = c.getData('direccion');
-      const min = c.getData('min');
-      const max = c.getData('max');
-      if (ve) direccion = Math.sign(dx) || direccion;
-      else if (cuerpo.center.x <= min) direccion = 1;
-      else if (cuerpo.center.x >= max) direccion = -1;
-      let velocidad = ve ? CHOLITA.persecucion : CHOLITA.velocidad;
-      const adelante = cuerpo.center.x + direccion * 6;
-      if (adelante < min - 30 || adelante > max + 30 || (ve && Math.abs(dx) < CHOLITA.alcance)) velocidad = 0;
-      c.setData('direccion', direccion).setFlipX(direccion < 0);
-      cuerpo.setVelocityX(enSuelo ? direccion * velocidad : 0);
-      if (velocidad) { c.anims.resume(); c.anims.timeScale = velocidad / CHOLITA.velocidad * 0.7; } else c.anims.pause();
     });
   }
 
@@ -917,6 +857,7 @@ class Cueva extends Phaser.Scene {
     // Muerte (ave_muerta.jpeg): golpeado y aturdido, cae de espaldas, choca
     // contra el piso con polvo y queda tendido con estrellitas (moverGuacharos).
     g.setData('estado', 'muerto');
+    sonarSfx(this, 'muerteNpc'); // Armas.js (enemigo común)
     sumarPuntos(this, 150);
     this.tweens.killTweensOf(g);
     if (g.getData('sombra')) g.getData('sombra').setVisible(false);
@@ -957,15 +898,15 @@ class Cueva extends Phaser.Scene {
     this.time.delayedCall(1500, () => p.destroy());
   }
 
+  // Colisiones de los soldados y los garroteros (Soldados.js, Garroteros.js).
+  colisionesEnemigos(grupo) {
+    this.pisar(grupo);
+  }
+
   // Explosiones, escopetazo y machete (Jugador.js): todo lo que esté en el radio.
   danoEnArea(x, y, radio, dano, cuerpo = false) {
-    this.cholitas.getChildren().forEach((c) => {
-      const estado = c.getData('estado');
-      if (estado !== 'ronda' && estado !== 'ataque') return;
-      if (Phaser.Math.Distance.Between(x, y, c.x, c.y - CHOLITA.alto * ESCALA / 2) > radio + 20) return;
-      if (cuerpo) sangrar(this, c.x, c.y - CHOLITA.alto * ESCALA / 2, c.x < x ? -1 : 1);
-      this.vencerCholita(c, x, !cuerpo);
-    });
+    this.soldadosEnArea(x, y, radio, cuerpo);
+    this.garroterosEnArea(x, y, radio, cuerpo);
     this.guacharos.getChildren().forEach((g) => {
       if (g.getData('estado') !== 'muerto' && Phaser.Math.Distance.Between(x, y, g.x, g.y) <= radio + 20) this.danarGuacharo(g, dano, !cuerpo);
     });
@@ -1117,10 +1058,11 @@ class Cueva extends Phaser.Scene {
     const { width, height } = this.scale;
     const A = CUEVA.agua;
     const ADD = Phaser.BlendModes.ADD;
-    // Lejos (parallax 0.3): cascadas que caen a un lago.
+    // Lejos (parallax 0.3): cascadas que caen a un lago. Tenues y frías: con
+    // más brillo se veían como columnas de luz blanca delante del fondo.
     this.aguaFondo = [
       this.add.tileSprite(0, -10, width / ESCALA, 190, 'cuevaCascadas').setOrigin(0).setScale(ESCALA)
-        .setScrollFactor(0).setDepth(0.3).setTint(0x7c98ac).setAlpha(0.7).setData({ factor: 0.3, caida: 0.07 }),
+        .setScrollFactor(0).setDepth(0.3).setTint(0x56708a).setAlpha(0.42).setData({ factor: 0.3, caida: 0.07 }),
       this.add.tileSprite(0, 336, width / ESCALA, 20, 'cuevaLago').setOrigin(0).setScale(ESCALA)
         .setScrollFactor(0).setDepth(0.31).setTint(0x8aa4b4).setAlpha(0.85).setData({ factor: 0.3, deriva: 0.006 })
     ];
@@ -1405,7 +1347,7 @@ class Cueva extends Phaser.Scene {
   vivosEnZona(z) {
     const cam = this.cameras.main;
     const aLaVista = (o) => o.x > cam.scrollX - 80 && o.x < cam.scrollX + this.scale.width + 80;
-    const vivas = this.cholitas.getChildren().filter((c) => c.getData('zona') === z &&
+    const vivas = [...this.soldados.getChildren(), ...this.garroteros.getChildren()].filter((c) => c.getData('zona') === z &&
       ['ronda', 'ataque'].includes(c.getData('estado')) && aLaVista(c)).length;
     const aves = this.guacharos.getChildren().filter((g) => g.getData('zona') === z && g.getData('estado') !== 'muerto' && aLaVista(g)).length;
     return vivas + aves + this.pendientes[z];
@@ -1586,6 +1528,8 @@ class Cueva extends Phaser.Scene {
     const y = J.y + 12 * J.scaleY;
     const base = Phaser.Math.RadToDeg(Phaser.Math.Angle.Between(x, y, j.body.center.x, j.body.center.y));
     fogonazo(this, x, y, 2.4, 11, lado < 0 ? 180 : 0);
+    // Una ráfaga de ametralladora, grave (Armas.js).
+    for (let k = 0; k < n; k++) this.time.delayedCall(k * 60, () => sonarTramo(this, { ...SFX_ARMAS.ametralladora, volumen: 0.45, tono: 0.8 }, 'jefe'));
     this.cameras.main.shake(90, 0.003);
     for (let k = 0; k < n; k++) {
       const ang = base + (k - (n - 1) / 2) * B.dispersion + Phaser.Math.FloatBetween(-2, 2);
@@ -1732,10 +1676,16 @@ class Cueva extends Phaser.Scene {
       g: () => ['ground', { x0: x - 60, y0: y, x1: x + 60, y1: y }],
       p: () => ['platforms', { x0: x - 50, x1: x + 50, y }],
       w: () => ['walls', { x: x - 15, y: y - 80, w: 30, h: 160 }],
-      l: () => ['ladders', { x0: x - 25, x1: x + 25, arriba: y - 100, abajo: y + 100 }]
+      l: () => ['ladders', { x0: x - 25, x1: x + 25, arriba: y - 100, abajo: y + 100 }],
+      // Techos que se caen (solo si el JSON los tiene: Nivel2).
+      t: () => d.tejas && ['tejas', { x0: x - 40, x1: x + 40, y }],
+      // La pared con grietas y el ascensor (solo si el JSON los tiene: Tuneles).
+      r: () => d.grietas && ['grietas', { x: x - 40, y: y - 80, w: 80, h: 160 }],
+      c: () => d.ascensores && ['ascensores', { x0: x - 45, x1: x + 45, arriba: y - 120, abajo: y + 120 }]
     }[k];
-    if (nuevo) {
-      const [tipo, pieza] = nuevo();
+    const agregado = nuevo && nuevo();
+    if (agregado) {
+      const [tipo, pieza] = agregado;
       d[tipo].push(pieza);
       this.editor.sel = { tipo, pieza };
     } else if ((k === 'delete' || k === 'backspace') && this.editor.sel) {
@@ -1770,8 +1720,8 @@ class Cueva extends Phaser.Scene {
   // Puntos de agarre de cada pieza: [x, y, clave].
   puntosPieza(tipo, p) {
     if (tipo === 'ground') return [[p.x0, p.y0, 'a'], [p.x1, p.y1, 'b']];
-    if (tipo === 'platforms') return [[p.x0, p.y, 'a'], [p.x1, p.y, 'b']];
-    if (tipo === 'walls') return [[p.x, p.y, 'a'], [p.x + p.w, p.y + p.h, 'b']];
+    if (tipo === 'platforms' || tipo === 'tejas') return [[p.x0, p.y, 'a'], [p.x1, p.y, 'b']];
+    if (EDITOR.cajas.includes(tipo)) return [[p.x, p.y, 'a'], [p.x + p.w, p.y + p.h, 'b']];
     return [[p.x0, p.arriba, 'a'], [p.x1, p.abajo, 'b']];
   }
 
@@ -1780,7 +1730,7 @@ class Cueva extends Phaser.Scene {
     const p = this.cameras.main.getWorldPoint(puntero.x, puntero.y);
     const d = this.colision;
     let mejor = null;
-    Object.keys(EDITOR.colores).forEach((tipo) => d[tipo].forEach((pieza) => {
+    Object.keys(this.coloresEditor || EDITOR.colores).forEach((tipo) => d[tipo].forEach((pieza) => {
       this.puntosPieza(tipo, pieza).forEach(([x, y, clave]) => {
         const dist = Phaser.Math.Distance.Between(p.x, p.y, x, y);
         if (dist < EDITOR.agarre && (!mejor || dist < mejor.dist)) mejor = { tipo, pieza, clave, dist };
@@ -1788,7 +1738,7 @@ class Cueva extends Phaser.Scene {
       if (mejor) return;
       // Del medio: toda la pieza.
       const [[ax, ay], [bx, by]] = this.puntosPieza(tipo, pieza);
-      const rect = tipo === 'walls' || tipo === 'ladders';
+      const rect = EDITOR.cajas.includes(tipo) || EDITOR.tramos.includes(tipo);
       const dentro = rect
         ? p.x >= Math.min(ax, bx) && p.x <= Math.max(ax, bx) && p.y >= Math.min(ay, by) && p.y <= Math.max(ay, by)
         : Phaser.Geom.Intersects.PointToLine(new Phaser.Geom.Point(p.x, p.y), new Phaser.Geom.Line(ax, ay, bx, by), 6);
@@ -1816,8 +1766,8 @@ class Cueva extends Phaser.Scene {
     }
     const b = a.clave === 'b';
     if (a.tipo === 'ground') { s[b ? 'x1' : 'x0'] = x; s[b ? 'y1' : 'y0'] = y; }
-    else if (a.tipo === 'platforms') { s[b ? 'x1' : 'x0'] = x; s.y = y; }
-    else if (a.tipo === 'ladders') { s[b ? 'x1' : 'x0'] = x; s[b ? 'abajo' : 'arriba'] = y; }
+    else if (a.tipo === 'platforms' || a.tipo === 'tejas') { s[b ? 'x1' : 'x0'] = x; s.y = y; }
+    else if (EDITOR.tramos.includes(a.tipo)) { s[b ? 'x1' : 'x0'] = x; s[b ? 'abajo' : 'arriba'] = y; }
     else if (b) { s.w = Math.max(4, x - s.x); s.h = Math.max(4, y - s.y); }
     else { s.w += s.x - x; s.h += s.y - y; s.x = x; s.y = y; }
   }
@@ -1826,13 +1776,14 @@ class Cueva extends Phaser.Scene {
     const g = this.dibujoEditor.clear();
     const d = this.colision;
     const sel = this.editor.sel && this.editor.sel.pieza;
-    Object.entries(EDITOR.colores).forEach(([tipo, color]) => d[tipo].forEach((p) => {
+    Object.entries(this.coloresEditor || EDITOR.colores).forEach(([tipo, color]) => d[tipo].forEach((p) => {
       const c = p === sel ? 0xffffff : color;
       const [[ax, ay], [bx, by]] = this.puntosPieza(tipo, p);
-      if (tipo === 'walls' || tipo === 'ladders') {
+      if (EDITOR.cajas.includes(tipo) || EDITOR.tramos.includes(tipo)) {
         g.fillStyle(c, 0.18).fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
         g.lineStyle(2, c, 1).strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
         if (tipo === 'ladders') for (let y = ay + 12; y < by; y += 16) g.lineBetween(ax, y, bx, y);
+        if (tipo === 'grietas') g.lineBetween(ax, ay, bx, by).lineBetween(bx, ay, ax, by);
       } else {
         g.lineStyle(3, c, 1).lineBetween(ax, ay, bx, by);
       }
@@ -1875,7 +1826,8 @@ class Cueva extends Phaser.Scene {
     else if (this.estado !== 'muerto' && !admin) cerrarSelector(this, false);
     if (!this.muerto && this.estado !== 'saliendo' && !admin) this.limitarJugador();
     if (admin && this.jugador.body.center.x > CUEVA.salida) this.salir();
-    this.moverCholitas();
+    this.moverSoldados();     // Soldados.js
+    this.moverGarroteros();   // Garroteros.js
     this.moverGuacharos(time);
     this.moverJefe(time);
     this.moverRehenes();
@@ -1883,16 +1835,16 @@ class Cueva extends Phaser.Scene {
     this.actualizarCamara(delta);
     this.actualizarZonas();
     this.actualizarSombra(this.sombraJugador, this.jugador);
-    this.cholitas.getChildren().forEach((c) => { if (c.getData('estado') !== 'vencida') this.actualizarSombra(c.getData('sombra'), c); });
     this.rehenes.getChildren().forEach((r) => this.actualizarSombra(r.getData('sombra'), r));
     this.pisarCharcos();
   }
 }
 
-// Movimiento, disparos y golpes del jugador (Jugador.js) y, de Nivel1, las
-// escaleras, el ataque de las cholitas, los rehenes y los avisos.
-Object.assign(Cueva.prototype, AccionesJugador);
-['escaleraEn', 'empezarATrepar', 'trepar', 'atacarCholita', 'chocarCholita', 'vencerCholita', 'aviso', 'crearAnimacionesNpc']
+// Movimiento, disparos y golpes del jugador (Jugador.js), los soldados
+// (Soldados.js), los garroteros (Garroteros.js) y, de Nivel1, las escaleras,
+// los rehenes y los avisos.
+Object.assign(Cueva.prototype, AccionesJugador, AccionesSoldados, AccionesGarroteros);
+['escaleraEn', 'empezarATrepar', 'trepar', 'aviso', 'crearAnimacionesNpc']
   .forEach((m) => { Cueva.prototype[m] = Nivel1.prototype[m]; });
 // Y al revés: Nivel1 usa este editor de colisión para la entrada a la cueva
 // (su alternarEditor y moverEditor son propios).

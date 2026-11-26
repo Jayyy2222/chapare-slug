@@ -52,7 +52,7 @@ function panelVida(escena) {
 
 // Caja de colisión en la celda de 84x84, apoyada en los pies (y 72).
 // Agachado se achica: las balas a la altura del pecho le pasan por encima.
-const CUERPO_JUGADOR = { ancho: 20, alto: 56, altoAgachado: 40, x: 28, pies: 72 };
+const CUERPO_JUGADOR = { ancho: 20, alto: 56, altoAgachado: 30, x: 28, pies: 72 };
 
 // Cuadros de cada personaje en su spritesheet (celdas de 84x84, pies en
 // x 38, y 72). El cuadro 0 es el parado. Lo que un personaje no tiene se
@@ -65,24 +65,27 @@ const CUERPO_JUGADOR = { ancho: 20, alto: 56, altoAgachado: 40, x: 28, pies: 72 
 // son las de esas poses; si no, se usa boca.
 const CUADROS_JUGADOR = {
   jugador: { caminar: [0, 7], aire: 2, boca: { x: 12, y: 8 } },
-  // herramientas/manfred_spritesheet.py (el orden de TIRAS)
+  // Manfred también es modular (CuerpoModular.js: piernas + torso, de
+  // herramientas/manfred_cuerpo.py): su sprite con física es invisible. Los
+  // rangos de esta hoja vieja (herramientas/manfred_spritesheet.py) solo
+  // habilitan las acciones (y su trepar marca si se mueve en la escalera).
   jugadorManfred: {
     agacharse: [0, 3], agachado: 3, caminar: [4, 15], correr: [16, 23], aire: 26,
     saltar: { subir: 25, arriba: 26, bajar: 27, caer: 28, aterrizar: 29 },
     ataque: [30, 33], ataqueArriba: [34, 37], agachadoAtaque: [38, 41], agachadoCaminar: [42, 47],
-    trepar: [48, 53], aturdido: [54, 59],
+    trepar: [48, 53], aturdido: [54, 59], altoAgachado: 22, modular: true,
     boca: { x: 22, y: -18 }, bocaCorrer: { x: 28, y: -6 }, bocaAire: { x: 25, y: -10 },
     bocaArriba: { x: 7, y: -42 }, bocaAgachado: { x: 18, y: 6 }
   },
-  // Tuto (CuerpoTuto.js): el sprite del jugador es una celda vacía (cuadro
+  // Tuto (CuerpoModular.js): el sprite del jugador es una celda vacía (cuadro
   // 0) y lo que se ve son sus piernas y su torso. Los rangos solo habilitan
   // las acciones (agacharse, apuntar arriba, trepar); la boca del arma sale
   // de la mano de cada cuadro (anchors.json). Agachado, la caja de colisión
-  // queda a la mitad del alto.
+  // queda bien baja (22 de 56: las balas de los soldados pasan por encima).
   jugadorTuto: {
     caminar: [0, 0], correr: [0, 0], aire: 0, agacharse: [0, 0], agachado: 0, agachadoCaminar: [0, 0],
     ataque: [0, 0], ataqueArriba: [0, 0], agachadoAtaque: [0, 0], trepar: [0, 0],
-    boca: { x: 12, y: -10 }, bocaCorrer: { x: 12, y: -10 }, altoAgachado: 28, modular: true
+    boca: { x: 12, y: -10 }, bocaCorrer: { x: 12, y: -10 }, altoAgachado: 22, modular: true
   }
 };
 
@@ -100,8 +103,8 @@ const ARMA_LARGA = { pistola: 7 };
 // registry). Los dos tienen celdas de 84x84 con los pies en el mismo lugar,
 // así que comparten caja de colisión. También lo usan Interior.js y JefeFinal.js.
 function texturaJugador(escena) {
-  if (escena.registry.get('personaje') === 'tuto') {
-    texturaBaseTuto(escena); // CuerpoTuto.js
+  if (PERSONAJES_MODULARES.includes(escena.registry.get('personaje'))) { // CuerpoModular.js
+    texturaBaseTuto(escena); // CuerpoModular.js
     return 'jugadorTuto';
   }
   return 'jugadorManfred';
@@ -144,6 +147,7 @@ const AccionesJugador = {
     texturasEfectos(this); // fx_bala, fx_fogonazo, fx_chispa... (EfectosMenu.js)
     this.agachado = false;
     this.apuntaArriba = false;
+    this.apuntaDiagonal = false;
     this.proximoDisparo = 0;
     this.disparandoHasta = 0;
     this.aterrizandoHasta = 0;
@@ -151,6 +155,7 @@ const AccionesJugador = {
     this.aturdido = null;
     this.recuperandoHasta = 0;
     this.muerto = false;
+    this.ocultarJugador = false; // Nivel1.entradaHelicoptero lo pone mientras baja
     this.panelVida = panelVida(this);
     this.hudVidas = hudVidas(this); // Estado.js: x3 con la carita
     // Reaparece después de perder una vida: ¡LISTO! mientras parpadea.
@@ -162,14 +167,15 @@ const AccionesJugador = {
     this.armaLarga = null;        // la de la escena anterior se destruyó con ella
     this.enSueloAhora = true;
     this.invulnerableHasta = 0;
-    this.cuerpoTuto = cuerpoJugador(this); // piernas + torso (CuerpoTuto.js) o null
+    this.cuerpoModular = cuerpoJugador(this); // piernas + torso (CuerpoModular.js)
     return textura;
   },
 
   // Postura según las teclas: ABAJO en el suelo agacha (achica la caja de
-  // colisión) y ARRIBA mira y apunta hacia arriba. Solo si el personaje tiene
-  // esos cuadros. Devuelve true si ARRIBA quedó para apuntar (entonces no
-  // salta: se salta con ESPACIO).
+  // colisión) y ARRIBA mira y apunta hacia arriba; ARRIBA caminando, en
+  // diagonal (si el cuerpo tiene ese torso: Manfred). Solo si el personaje
+  // tiene esos cuadros. Devuelve true si ARRIBA quedó para apuntar (entonces
+  // no salta: se salta con ESPACIO).
   posturaJugador(enSuelo, arriba, abajo) {
     const cuadros = this.cuadrosJugador;
     const agachado = enSuelo && abajo && cuadros.agachado !== undefined;
@@ -180,8 +186,20 @@ const AccionesJugador = {
       this.jugador.body.setSize(c.ancho, alto, false).setOffset(c.x, c.pies - alto);
       if (agachado) this.agachandoHasta = this.time.now + 150;
     }
-    this.apuntaArriba = !agachado && arriba && !!cuadros.ataqueArriba;
-    return this.apuntaArriba;
+    const apunta = !agachado && arriba && !!cuadros.ataqueArriba;
+    // Con margen (CUERPO.margen, CuerpoModular.js): contra una pared la
+    // velocidad va y viene y el torso saltaba entre arriba y diagonal.
+    if (Math.abs(this.jugador.body.velocity.x) > 5) this.caminaHasta = this.time.now + CUERPO.margen;
+    const camina = this.time.now < (this.caminaHasta || 0);
+    this.apuntaDiagonal = apunta && camina && !!(this.cuerpoModular && this.cuerpoModular.c.anims.diagonal);
+    this.apuntaArriba = apunta && !this.apuntaDiagonal;
+    // Agachado, ARRIBA no hace nada (antes saltaba: se paraba y salía volando).
+    return apunta || (agachado && arriba);
+  },
+
+  // Grados que levanta el arma: 0 adelante, 45 en diagonal, 90 arriba.
+  elevacion() {
+    return this.apuntaArriba ? 90 : this.apuntaDiagonal ? 45 : 0;
   },
 
   // Cuadro o animación del jugador según lo que está haciendo. Al caer, el
@@ -203,7 +221,7 @@ const AccionesJugador = {
       const golpeado = ahora - this.aturdido.desde < JUGADOR.aturdido.golpe;
       j.anims.timeScale = 1;
       const anim = golpeado ? 'jugador_golpeado' : 'jugador_mareado';
-      if (cuadros.aturdido) j.anims.play(anim, true); // Tuto no tiene: lo muestra CuerpoTuto
+      if (cuadros.aturdido) j.anims.play(anim, true); // lo muestra CuerpoModular
     } else if (ahora < this.recuperandoHasta) {
       j.anims.stop();
       if (cuadros.aturdido) j.setFrame(cuadros.aturdido[1]);
@@ -267,7 +285,7 @@ const AccionesJugador = {
   // larga, la punta de su caño: la empuñadura va en la mano (donde estaba la
   // pistola) y el caño sale de ahí (Armas.bocaDesdeMano).
   bocaArma() {
-    if (this.cuerpoTuto) return this.cuerpoTuto.bocaRelativa(); // la mano del cuadro (CuerpoTuto.js)
+    if (this.cuerpoModular) return this.cuerpoModular.bocaRelativa(); // la mano del cuadro (CuerpoModular.js)
     const cuadros = this.cuadrosJugador;
     const pose = this.poseArma();
     const boca = cuadros[pose] || cuadros.boca;
@@ -294,7 +312,7 @@ const AccionesJugador = {
   // El arma larga dibujada sobre la mano (no hay cuadros del personaje con
   // ella): sigue la boca de la pose; de espaldas, mareado o muerto no se ve.
   mostrarArmaLarga() {
-    if (this.cuerpoTuto) return; // la pone CuerpoTuto en la mano de cada cuadro
+    if (this.cuerpoModular) return; // la pone CuerpoModular en la mano de cada cuadro
     const j = this.jugador;
     const arma = ARMAS[armaJugador(this)];
     const visible = this.llevaArmaLarga() && !this.trepando && !this.aturdido && !this.muerto &&
@@ -346,31 +364,33 @@ const AccionesJugador = {
     // A tamaño real (EXPLOSIONES en Armas.js), apoyada un poco debajo del impacto.
     const escala = escalaExplosion(tipo);
     explotar(this, x, y + 12 * escala, EXPLOSIONES[tipo].efecto, escala); // Efectos.js
+    sonarImpacto(this, tipo); // Armas.js
     this.cameras.main.shake(tipo === 'cohete' ? 220 : 150, tipo === 'cohete' ? 0.012 : 0.007);
     if (this.danoEnArea) this.danoEnArea(x, y, radioExplosion(tipo), bala.getData('dano'));
   },
 
 
   // Un disparo del arma que lleva (ARMAS en Armas.js) desde la punta del arma
-  // hacia donde mira (o hacia arriba), con fogonazo. 'rebote': hacia dónde
+  // hacia donde mira (o en diagonal, o hacia arriba), con fogonazo. 'rebote': hacia dónde
   // saltan las chispas al pegar.
   disparar() {
     const j = this.jugador;
     const lado = j.flipX ? -1 : 1;
-    const arriba = this.apuntaArriba;
+    const elevacion = this.elevacion();
     const arma = ARMAS[armaJugador(this)];
     const boca = this.bocaArma();
     const x = j.x + lado * boca.x * ESCALA;
     const y = j.y + boca.y * ESCALA;
-    const angulo = arriba ? -90 : lado < 0 ? 180 : 0;
+    const angulo = anguloDisparo(lado, elevacion); // Armas.js
     this.proximoDisparo = this.time.now + arma.cadencia;
     this.disparandoHasta = this.time.now + DISPARO.pose;
+    sonarArma(this, armaJugador(this)); // Armas.js
     if (arma.tipo === 'cuerpo') {
       this.golpeCuerpo(arma, lado);
       return;
     }
     if (arma.tipo === 'onda') {
-      this.escopetazo(arma, x, y, lado, arriba);
+      this.escopetazo(arma, x, y, lado, elevacion);
       gastarMunicion(this);
       return;
     }
@@ -415,16 +435,18 @@ const AccionesJugador = {
 
   // Escopeta: el fogonazo de Metal Slug sale de la boca y lastima todo lo que
   // cubre (tres círculos a lo largo del cono, cada vez más anchos).
-  escopetazo(arma, x, y, lado, arriba) {
+  // elevacion: 0 adelante, 45 diagonal, 90 arriba.
+  escopetazo(arma, x, y, lado, elevacion) {
     const largo = metros(arma.alcance); // Armas.js
     const escala = largo / EFECTOS.escopetazo.ancho;
-    efecto(this, 'escopetazo', x, y, { escala, espejo: !arriba && lado < 0, angulo: arriba ? -90 : 0, profundidad: 10.3 });
+    efecto(this, 'escopetazo', x, y, { escala, ...fxEscopetazo(lado, elevacion), profundidad: 10.3 });
     this.cameras.main.shake(90, 0.004);
     casquillo(this, this.jugador.x + lado * 10, y - 4, 10.1);
     if (!this.danoEnArea) return;
+    const rad = Phaser.Math.DegToRad(anguloDisparo(lado, elevacion));
     [0.25, 0.55, 0.85].forEach((t) => {
-      const px = arriba ? x : x + lado * largo * t;
-      const py = arriba ? y - largo * t : y;
+      const px = x + Math.cos(rad) * largo * t;
+      const py = y + Math.sin(rad) * largo * t;
       this.danoEnArea(px, py, largo * (0.12 + t * 0.25), arma.dano, true);
     });
   },
@@ -454,17 +476,24 @@ const AccionesJugador = {
   // Empuja al jugador lejos de desdeX y le baja la vida (VIDA): en
   // VIDA.aturde queda mareado (ver seguirAturdido), sin vida muere y si no,
   // parpadea un rato sin recibir otro golpe. Devuelve false si no le pegó
-  // (todavía invulnerable, mareado o muerto).
-  golpearJugador(desdeX) {
+  // (todavía invulnerable, mareado o muerto). empuje: cuánto lo despide (1 = normal).
+  golpearJugador(desdeX, empuje = 1) {
     if (this.muerto || this.aturdido || this.time.now < this.invulnerableHasta) return false;
+    if (this.registry.get('inmune')) return false; // truco secreto: escribir "vida" (Admin.js)
     const j = this.jugador;
     const lado = Math.sign(j.body.center.x - desdeX) || 1;
     this.trepando = null;
     this.posturaJugador(false, false, false); // se levanta
     this.rampaActual = null;
     j.body.setAllowGravity(true);
-    j.setVelocity(lado * JUGADOR.golpe.empujon.x, -JUGADOR.golpe.empujon.y);
-    this.golpeHasta = this.time.now + 350;
+    j.setVelocity(lado * JUGADOR.golpe.empujon.x * empuje, -JUGADOR.golpe.empujon.y * empuje);
+    // El golpe no lo tira por un borde (al río, a un barranco, fuera del piso):
+    // si detrás hay un bajón, solo salta en el lugar.
+    const atras = j.body.center.x + lado * 90;
+    const piso = this.sueloBajo ? this.sueloBajo(atras, j.body.bottom - 20)
+      : this.superficie ? (this.superficie(atras, j.body.bottom - 20) || {}).y : undefined;
+    if (piso !== undefined && piso > j.body.bottom + 60) j.setVelocityX(0);
+    this.golpeHasta = this.time.now + 350 * empuje;
     this.cameras.main.shake(120, 0.006);
     j.setTint(0xff6060);
     sangrar(this, j.x, j.y - 10, lado); // Efectos.js
@@ -475,7 +504,7 @@ const AccionesJugador = {
     this.panelVida.setFrame(cuadroVida(vida));
     this.tweens.add({ targets: this.panelVida, scale: VIDA.escala * 1.15, duration: 80, yoyo: true });
     if (vida <= 0) this.morirJugador(lado);
-    else if (antes > VIDA.aturde && vida <= VIDA.aturde && (this.cuadrosJugador.aturdido || this.cuerpoTuto)) this.aturdirJugador();
+    else if (antes > VIDA.aturde && vida <= VIDA.aturde && (this.cuadrosJugador.aturdido || this.cuerpoModular)) this.aturdirJugador();
     else this.parpadearJugador();
     return true;
   },
@@ -495,6 +524,7 @@ const AccionesJugador = {
     const cuadros = this.cuadrosJugador;
     this.muerto = true;
     this.estado = 'muerto';
+    this.ladoMuerte = lado; // Tuto (CuerpoModular.js): cae con la cabeza hacia ese lado
     cerrarSelector(this, false); // Armas.js
     this.mostrarArmaLarga(); // la esconde
     this.panelVida.setVisible(false);

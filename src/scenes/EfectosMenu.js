@@ -70,6 +70,10 @@ function texturasEfectos(escena) {
     '......w......'
   ], { w: 0xffffff, y: 0xffd23f });
   texturaCirculoTramado(escena, 'fx_humo', 10, 0x5a554a, [0.15, 0.3, 0.45, 0.6]);
+  // Humo claro (el puf del NPC de la hamburguesa) y polvo de tierra: el tinte
+  // solo oscurece, así que necesitan su propio color.
+  texturaCirculoTramado(escena, 'fx_puf', 10, 0xf4f0e6, [0.3, 0.55, 0.8, 0.95]);
+  texturaCirculoTramado(escena, 'fx_polvo', 8, 0xcdbb98, [0.25, 0.45, 0.65, 0.8]);
   texturaCirculoTramado(escena, 'fx_explosion', 16, 0xffb02a, [0.3, 0.6, 0.85, 1]);
   texturaCirculoTramado(escena, 'fx_llama', 5, 0xff9a2a, [0.4, 0.75, 1]);
   // Agujero de bala: centro negro con borde claro astillado.

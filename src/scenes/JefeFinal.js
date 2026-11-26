@@ -3,6 +3,8 @@
 // (assets/fondos/final/interiror_final.jpeg). Se llega por la puerta del
 // edificio en Nivel1 y no se vuelve.
 //
+// Al vencerlo se escapa en helicóptero (EscapeCutscene.js) y se gana al salir
+// de la base por la derecha.
 // Guion:
 //   1. entrada:        el jugador entra caminando desde la izquierda.
 //   2. llegada:        un minibús entra desde la izquierda (por detrás del
@@ -37,14 +39,19 @@ const JEFE = {
   minibus: { ancho: 218, alto: 90, cuadros: 6, llegada: -300, frena: 640, puerta: -33 },
   // Celdas y cuadros (jefe_cuadros.json).
   normal: {
-    textura: 'jefe', ancho: 88, alto: 79,
+    textura: 'jefe', ancho: 85, alto: 79,
     pose: [0, 1], caminar: [2, 13], ataque: [14, 19], revive: [20, 27],
     cuerpo: { ancho: 22, alto: 52 },
     vida: 25, velocidad: 95, alcance: 100, golpe: 3, pausa: 1100, alto_golpe: 80
   },
   gigante: {
-    textura: 'jefeGigante', ancho: 215, alto: 127,
-    aparece: [0, 1], caminar: [2, 8], ataque: [9, 16], muerte: [17, 25],
+    textura: 'jefeGigante', ancho: 257, alto: 127,
+    aparece: [0, 1], caminar: [2, 5], ataque: [6, 13], muerte: [14, 22],
+    // Los cuadros de `aparece` traen los rayos, el polvo y el aura dibujados:
+    // quietos parecían una imagen pegada. La transformación usa la guardia
+    // (puños cerrados, cuadros limpios) y los efectos de verdad (rayos,
+    // arcos y estelas, que se mueven).
+    guardia: [6, 13],
     cuerpo: { ancho: 52, alto: 110 },
     vida: 45, velocidad: 70, alcance: 200, pausa: 1500,
     // Cuadros del combo (0 = guardia): 3 puñete de energía al frente, 6
@@ -57,20 +64,27 @@ const JEFE = {
   }
 };
 
+// Lo que tira el guion de la transformación cuando se cancela (no es un error).
+const CANCELADO = { cancelado: true };
+
 class JefeFinal extends Phaser.Scene {
   constructor() {
     super('JefeFinal');
   }
 
   preload() {
+    cargarSfxArmas(this); // Armas.js (solo lo que falta)
     this.load.image('interiorFinal', 'assets/fondos/final/interiror_final.jpeg');
     this.load.spritesheet('minibus', 'assets/jefes/minibus_sheet.png', { frameWidth: JEFE.minibus.ancho, frameHeight: JEFE.minibus.alto });
     this.load.spritesheet('jefe', 'assets/jefes/jefe_sheet.png', { frameWidth: JEFE.normal.ancho, frameHeight: JEFE.normal.alto });
     this.load.spritesheet('jefeGigante', 'assets/jefes/jefe_gigante_sheet.png', { frameWidth: JEFE.gigante.ancho, frameHeight: JEFE.gigante.alto });
+    cargarEscape(this); // EscapeCutscene.js: la huida en helicóptero
   }
 
   create() {
     const { width, height } = this.scale;
+    this.furia = false;   // fondoFuria: una sola vez por pelea
+    this.transfo = null;  // la transformación en curso (revivir)
     this.fondo = this.add.image(0, 0, 'interiorFinal').setOrigin(0).setDisplaySize(width, height).setDepth(0);
     this.physics.world.setBounds(ARENA.izquierda, 0, ARENA.derecha - ARENA.izquierda, height);
     this.physics.world.setBoundsCollision(true, true, false, false);
@@ -99,6 +113,9 @@ class JefeFinal extends Phaser.Scene {
     animacion('jefe_caminar', 'jefe', n.caminar, 12, -1);
     animacion('jefe_ataque', 'jefe', n.ataque, 10);
     animacion('jefe_revive', 'jefe', n.revive, 3);
+    // Cargando la transformación: los últimos cuadros del revive (con el aura) en bucle.
+    this.anims.create({ key: 'jefe_carga', repeat: -1, frameRate: 10,
+      frames: [n.revive[1] - 2, n.revive[1] - 1, n.revive[1], n.revive[1] - 1].map((frame) => ({ key: 'jefe', frame })) });
     animacion('gigante_caminar', 'jefeGigante', g.caminar, 8, -1);
     animacion('gigante_ataque', 'jefeGigante', g.ataque, 9);
   }
@@ -123,8 +140,17 @@ class JefeFinal extends Phaser.Scene {
     return new Promise((listo) => this.time.delayedCall(ms, listo));
   }
 
+  // Un tween como promesa. Termina con onComplete, con onStop (si alguien lo
+  // corta) o, de respaldo, cuando ya pasó su duración: un guion nunca queda
+  // esperando para siempre.
   moverA(objetivo, props) {
-    return new Promise((listo) => this.tweens.add({ targets: objetivo, ...props, onComplete: listo }));
+    return new Promise((listo) => {
+      let hecho = false;
+      const fin = () => { if (!hecho) { hecho = true; listo(); } };
+      this.tweens.add({ targets: objetivo, ...props, onComplete: fin, onStop: fin });
+      const vueltas = (props.repeat > 0 ? props.repeat + 1 : 1) * (props.yoyo ? 2 : 1);
+      this.time.delayedCall((props.delay || 0) + (props.duration ?? 1000) * vueltas + 250, fin);
+    });
   }
 
   // El minibús entra desde la izquierda pasando por detrás del jugador, frena,
@@ -321,12 +347,24 @@ class JefeFinal extends Phaser.Scene {
     this.altos = this.altos || {};
     const id = clave + ':' + cuadro;
     if (this.altos[id] === undefined) {
+      // Se copia el cuadro entero a un lienzo y se lee de una vez. (Antes era
+      // un getPixelAlpha por píxel: miles de lecturas de la GPU por cuadro
+      // nuevo, y con el cuadro del gigante el juego se congelaba al final de
+      // la transformación.)
       const f = this.textures.getFrame(clave, cuadro);
-      let arriba = f.height;
+      const w = f.cutWidth;
+      const h = f.cutHeight;
+      const lienzo = document.createElement('canvas');
+      lienzo.width = w;
+      lienzo.height = h;
+      const ctx = lienzo.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(f.source.image, f.cutX, f.cutY, w, h, 0, 0, w, h);
+      const datos = ctx.getImageData(0, 0, w, h).data;
+      let arriba = h;
       let abajo = 0;
-      for (let y = 0; y < f.height; y++) {
-        for (let x = 0; x < f.width; x += 2) {
-          if (this.textures.getPixelAlpha(x, y, clave, cuadro) > 0) {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (datos[(y * w + x) * 4 + 3] > 0) {
             arriba = Math.min(arriba, y);
             abajo = y;
             break;
@@ -441,9 +479,30 @@ class JefeFinal extends Phaser.Scene {
   //   3. estallido: un rayo enorme, fogonazo, y en su lugar el gigante, del
   //      mismo alto que tenía (así las proporciones crecen parejas);
   //   4. el gigante termina de crecer en golpes, uno por rayo, y ruge.
-  async revivir() {
-    const jefe = this.jefe;
+  // Si el guion falla (un error) o tarda de más, el gigante igual queda listo
+  // para pelear (terminarTransformacion): el juego no se queda trabado.
+  revivir() {
     this.estado = 'transformacion';
+    const t = this.transfo = { cancelado: false, limpiar: [], xBase: this.jefe.x };
+    const rescate = (motivo) => {
+      if (this.transfo !== t || t.cancelado) return;
+      console.warn('Transformación del jefe rescatada:', motivo);
+      this.terminarTransformacion();
+    };
+    this.time.delayedCall(18000, () => rescate('tardó demasiado'));
+    this.guionTransformacion(t).catch((e) => {
+      if (e !== CANCELADO) { console.error(e); rescate(e); }
+    });
+  }
+
+  async guionTransformacion(t) {
+    const jefe = this.jefe;
+    // Cada espera revisa que la transformación no se haya cancelado.
+    const seguir = (v) => { if (t.cancelado) throw CANCELADO; return v; };
+    const esperar = (ms) => this.esperar(ms).then(seguir);
+    const moverA = (obj, props) => this.moverA(obj, props).then(seguir);
+    const cuadroJefe = (cuadro, ms) => this.cuadroJefe(cuadro, ms).then(seguir);
+    sonarSfx(this, 'transformacion'); // Armas.js: dura lo que la transformación
     jefe.removeAllListeners('animationupdate');
     jefe.removeAllListeners('animationcomplete');
     jefe.setVelocityX(0).clearTint();
@@ -454,79 +513,238 @@ class JefeFinal extends Phaser.Scene {
     // Alto final (el gigante a su escala) y alto al empezar: todo el
     // crecimiento se reparte entre los dos.
     // (cuadro de los rayos, el que se ve mientras termina de crecer).
-    const altoFinal = this.altoVisible('jefeGigante', JEFE.gigante.aparece[0]) * ESCALA;
-    const crecerA = (alto, duracion, ease = 'Sine.inOut') => this.moverA(jefe, {
+    const G = JEFE.gigante.guardia;
+    const altoFinal = this.altoVisible('jefeGigante', G[0]) * ESCALA;
+    const crecerA = (alto, duracion, ease = 'Sine.inOut') => moverA(jefe, {
       scale: jefe.scaleX * alto / this.altoJefe(), duration: duracion, ease
     });
 
-    // 1. Revive lento: masca coca, se infla; la sala se apaga.
-    this.oscurecerSala(0.7, 2600);
-    this.tweens.add({ targets: this.sombraJefe, scaleX: 1.4, duration: 2600 });
-    jefe.play({ key: 'jefe_revive', frameRate: 3 });
-    const pulsoAura = this.time.addEvent({ delay: 260, loop: true, callback: () => this.arcosAura(1) });
-    this.tweens.add({ targets: jefe, scale: s0 * 1.12, duration: 2600, ease: 'Sine.inOut' });
-    await new Promise((listo) => jefe.once('animationcomplete', listo));
-    await this.esperar(250);
+    // Temblor del cuerpo (la fuerza crece): se suma a su x de base.
+    const xBase = jefe.x;
+    const tiembla = { amp: 1 };
+    const temblorCuerpo = this.time.addEvent({
+      delay: 40, loop: true, callback: () => { if (jefe.active) jefe.x = xBase + Phaser.Math.FloatBetween(-tiembla.amp, tiembla.amp); }
+    });
+    t.limpiar.push(() => temblorCuerpo.remove());
+    // Piedras y polvo que se levantan del piso a su alrededor.
+    const escombros = this.add.particles(xBase, ARENA.piso - 4, 'fx_humo', {
+      x: { min: -110, max: 110 }, speedY: { min: -140, max: -40 }, speedX: { min: -30, max: 30 },
+      lifespan: 900, scale: { start: 0.8, end: 2.2 }, alpha: { start: 0.55, end: 0 }, tint: [0xc8b090, 0x8a7458],
+      frequency: 160
+    }).setDepth(9.4);
+    t.limpiar.push(() => { if (escombros.active) escombros.destroy(); });
+
+    // 1. Revive (revive_boss, cuadro por cuadro y nunca quieto): busca la
+    //    coca en la ch'uspa, se la lleva a la boca, masca (las hojitas
+    //    saltan), se le inflan los músculos de a golpes (se rompe la ropa) y
+    //    se prende el aura. Respira todo el tiempo; la sala se apaga.
+    jefe.anims.stop();
+    this.oscurecerSala(0.7, 3000);
+    this.tweens.add({ targets: this.sombraJefe, scaleX: 1.4, duration: 3000 });
+    tiembla.amp = 0.4;
+    escombros.frequency = 400;
+    const r0 = JEFE.normal.revive[0];
+    const respira = this.respirar(jefe, 0.035, 320);
+    t.limpiar.push(() => respira.stop());
+    // Busca en la ch'uspa (0-1): se agacha un poco cada vez que mete la mano.
+    for (let k = 0; k < 3; k++) {
+      await cuadroJefe(r0, 260);
+      this.agacharse(jefe, 0.05, 130);
+      await cuadroJefe(r0 + 1, 300);
+      this.hojasCoca(this.puntoJefe(-0.3, 0.38), 4, 60);
+    }
+    this.aviso(jefe.x, jefe.y - this.altoJefe() - 20, '¿COQUITA?', 'plata');
+    // Se la lleva a la boca (2) y masca (2-3): cabeceo y hojitas a cada mordida.
+    await cuadroJefe(r0 + 2, 260);
+    this.hojasCoca(this.puntoJefe(0.05, 0.8), 8, 120);
+    for (let k = 0; k < 6; k++) {
+      await cuadroJefe(r0 + 2 + (k % 2), 170);
+      this.cabecear(jefe, k % 2 ? 2 : -2);
+      if (k % 2) this.hojasCoca(this.puntoJefe(0.05, 0.8), 3, 80);
+      if (k === 1 || k === 4) this.aviso(jefe.x + 40, jefe.y - this.altoJefe() - 10, '¡ÑAC ÑAC!', 'oro');
+    }
+    // Se infla (4-5): cada bombeo lo agranda de golpe, sacude y rompe la ropa.
+    const pulsoAura = this.time.addEvent({ delay: 300, loop: true, callback: () => this.arcosAura(1) });
+    t.limpiar.push(() => pulsoAura.remove());
+    for (let k = 0; k < 5; k++) {
+      await cuadroJefe(r0 + 4 + (k % 2), 210);
+      const escala = s0 * (1 + 0.025 * (k + 1));
+      this.tweens.add({ targets: jefe, scaleX: escala * 1.06, duration: 70, yoyo: true, ease: 'Quad.out',
+        onComplete: () => jefe.setScale(escala, jefe.scaleY) });
+      this.cameras.main.shake(120, 0.004 + k * 0.001);
+      this.jironesRopa(this.puntoJefe(Phaser.Math.FloatBetween(-0.3, 0.3), Phaser.Math.FloatBetween(0.35, 0.7)));
+      tiembla.amp = 0.6 + k * 0.4;
+      if (k === 2) this.aviso(jefe.x, jefe.y - this.altoJefe() - 20, '¡GRRR!', 'rojo');
+    }
+    // Se prende el aura (6-7): fogonazo verde, anillo y estela.
+    respira.stop();
+    jefe.setScale(jefe.scaleX);
+    await cuadroJefe(r0 + 6, 0);
+    this.anilloAura(jefe.x, ARENA.piso - 4, 0x6aff9a);
+    fogonazo(this, jefe.x, jefe.y - this.altoJefe() * 0.5, 3, 11);
+    this.cameras.main.flash(120, 160, 255, 180);
+    // Grita: el aura en bucle, tiembla más y suelta más escombros.
+    jefe.play('jefe_carga');
+    this.respiracion = this.respirar(jefe, 0.05, 200);
+    tiembla.amp = 2.5;
+    escombros.frequency = 70;
+    this.cameras.main.shake(250, 0.008);
+    await esperar(250);
 
     // 2. Carga: destellos cada vez más seguidos, rayos del techo y crece en cada uno.
     const temblor = this.time.addEvent({ delay: 110, loop: true, callback: () => this.cameras.main.shake(100, 0.004) });
+    t.limpiar.push(() => temblor.remove());
     this.oscurecerSala(0.92, 3000);
     const alto0 = this.altoJefe();
     const pasos = [420, 360, 300, 250, 200, 160, 130, 110, 90, 80, 70, 60];
     for (const [i, espera] of pasos.entries()) {
       jefe.setTintFill(0xffffff);
       this.arcosAura(2 + Math.floor(i / 3));
+      tiembla.amp = 2.5 + i * 0.4; // cada vez más fuerte
+      if (i % 2 === 0) this.estelaJefe(i % 4 === 0 ? 0x6aff9a : 0xffffff);
+      if (i % 4 === 1) this.anilloAura(jefe.x, ARENA.piso - 4, 0x9affc0);
       if (i % 3 === 2) {
         this.rayoSobreJefe(1 + Math.floor(i / 4));
         // Crece hasta ~75% del gigante, de a poco.
-        crecerA(alto0 + (altoFinal * 0.75 - alto0) * ((i + 1) / pasos.length), 260, 'Back.out');
+        crecerA(alto0 + (altoFinal * 0.75 - alto0) * ((i + 1) / pasos.length), 260, 'Back.out').catch(() => {}); // sin esperarlo
       }
-      await this.esperar(50);
+      await esperar(50);
       jefe.clearTint();
-      await this.esperar(espera);
+      await esperar(espera);
     }
     pulsoAura.remove();
     jefe.setTintFill(0xffffff);
-    await this.esperar(200);
+    await esperar(200);
 
     // 3. Estallido: rayo enorme y el gigante aparece del mismo alto, en blanco.
     temblor.remove();
+    escombros.explode(30);
     for (let k = 0; k < 3; k++) this.rayoSobreJefe(3);
     this.cameras.main.flash(600, 255, 255, 235);
     this.cameras.main.shake(900, 0.02);
     explotar(this, jefe.x, ARENA.piso - 40, 'grande', ESCALA * 1.2); // Efectos.js
     const altoAntes = this.altoJefe();
     this.fase = 'gigante';
+    if (this.respiracion) { this.respiracion.stop(); this.respiracion = null; }
     jefe.anims.stop();
-    jefe.setTexture('jefeGigante', JEFE.gigante.aparece[0]);
-    jefe.setScale(altoAntes / this.altoVisible('jefeGigante', JEFE.gigante.aparece[0]));
+    // Metamorfosis: salta entre el cuerpo de antes y el gigante, cada vez más
+    // rápido y más grande (los dos del mismo alto en cada salto), con estela.
+    const normal = { clave: 'jefe', cuadro: JEFE.normal.revive[1] };
+    const gigante = { clave: 'jefeGigante', cuadro: G[0] };
+    const saltos = [150, 130, 110, 90, 75, 60, 50, 40];
+    for (const [k, espera] of saltos.entries()) {
+      const cuerpo = k % 2 ? normal : gigante;
+      const alto = altoAntes * (1 + 0.03 * k);
+      jefe.setTexture(cuerpo.clave, cuerpo.cuadro).setScale(alto / this.altoVisible(cuerpo.clave, cuerpo.cuadro));
+      if (k % 2) jefe.setTintFill(0xffffff); else jefe.clearTint().setTint(0xd0ffe0);
+      this.estelaJefe(k % 2 ? 0xffffff : 0x6aff9a);
+      this.cameras.main.shake(60, 0.006);
+      await esperar(espera);
+    }
+    jefe.setTexture('jefeGigante', G[0]);
+    jefe.setScale(altoAntes * 1.24 / this.altoVisible('jefeGigante', G[0]));
     jefe.setTintFill(0xffffff);
+    this.anilloAura(jefe.x, ARENA.piso - 4, 0xffffff, 2);
     this.ajustarCuerpoJefe();
     chispas(this, jefe.x - 70, ARENA.piso - 4, 24, -110, 80, 11);
     chispas(this, jefe.x + 70, ARENA.piso - 4, 24, -70, 80, 11);
     this.fondoFuria();
 
-    // 4. Termina de crecer en golpes, uno por rayo (el cuadro 0 es el de los rayos).
+    // 4. Termina de crecer en golpes, uno por rayo. Nunca queda quieto:
+    //    respira (se hincha), tiembla, aprieta los puños (salta entre los dos
+    //    cuadros de guardia), cabecea y el aura chisporrotea alrededor.
+    const respiraG = this.respirar(jefe, 0.045, 230);
+    t.limpiar.push(() => respiraG.stop());
+    let puno = 0;
+    const tension = this.time.addEvent({
+      delay: 140, loop: true, callback: () => {
+        if (!jefe.active) return;
+        puno = 1 - puno;
+        jefe.setFrame(G[puno]);
+        this.arcosAura(1);
+      }
+    });
+    t.limpiar.push(() => tension.remove());
     const altoG = this.altoJefe();
     for (let k = 1; k <= 4; k++) {
       this.rayoSobreJefe(2);
       this.arcosAura(4);
+      this.estelaJefe(0xffd0a0);
+      this.cabecear(jefe, k % 2 ? 3 : -3);
+      tiembla.amp = 3 + k;
       await crecerA(altoG + (altoFinal - altoG) * (k / 4), 380, 'Back.out');
       if (k === 2) jefe.clearTint();
-      await this.esperar(220);
+      // Entre golpe y golpe se encorva (toma aire) y suelta un anillo.
+      this.agacharse(jefe, 0.06, 110);
+      this.anilloAura(jefe.x, ARENA.piso - 4, 0xffb070, 1);
+      await esperar(220);
     }
-    jefe.setScale(ESCALA).clearTint();
+    tension.remove();
+    respiraG.stop();
+    temblorCuerpo.remove();
+    escombros.stop();
+    this.time.delayedCall(1000, () => escombros.destroy());
+    jefe.x = xBase;
+    jefe.setScale(ESCALA).setAngle(0).clearTint().setFrame(G[0]);
+    // Cae con todo su peso: se aplasta, rebota y levanta polvo.
+    this.polvoAterrizaje(jefe.x);
+    this.cameras.main.shake(350, 0.015);
+    this.tweens.add({ targets: jefe, scaleY: ESCALA * 0.88, scaleX: ESCALA * 1.08, duration: 90, yoyo: true, ease: 'Quad.out' });
     this.tweens.add({ targets: this.sombraJefe, scaleX: 1.9, duration: 400 });
     this.cartel('¡NO SE RINDE!', 'rojo');
+    // Ruge: onda de choque, zoom de golpe y el grito.
+    this.anilloAura(jefe.x, ARENA.piso - 4, 0xff6040, 3);
+    this.aviso(jefe.x, jefe.y - this.altoJefe() - 10, '¡GRAAAH!', 'rojo');
+    // La cámara solo entiende los nombres largos de ease ('Quad.easeOut'): con
+    // 'Quad.out' tiraba "this.ease is not a function" en cada cuadro y el
+    // juego quedaba congelado justo cuando el gigante terminaba de crecer.
+    this.cameras.main.zoomTo(1.06, 90, 'Quad.easeOut', true);
+    this.time.delayedCall(260, () => this.cameras.main.zoomTo(1, 400, 'Sine.easeInOut', true));
+    // Mientras ruge: resopla fuerte, sacude la cabeza y aprieta los puños.
+    const ruge = this.respirar(jefe, 0.04, 160);
+    t.limpiar.push(() => ruge.stop());
+    const sacude = this.time.addEvent({
+      delay: 120, repeat: 12, callback: () => {
+        if (!jefe.active) return;
+        puno = 1 - puno;
+        jefe.setFrame(G[puno]);
+        this.cabecear(jefe, puno ? 2.5 : -2.5);
+        if (puno) this.arcosAura(2);
+      }
+    });
+    t.limpiar.push(() => sacude.remove());
+    this.time.delayedCall(1600, () => { ruge.stop(); if (jefe.active) jefe.setScale(ESCALA); });
     // En la pelea la sala queda en penumbra (el velo sigue al jefe).
     this.oscurecerSala(0.5, 1200);
     this.tweens.add({ targets: jefe, alpha: 0.6, duration: 70, yoyo: true, repeat: 6 });
-    await this.esperar(1000);
-    jefe.setAlpha(1).setFrame(JEFE.gigante.aparece[1]);
+    await esperar(1000);
+    jefe.setAlpha(1);
     jefe.body.setAllowGravity(true);
     jefe.body.reset(jefe.x, ARENA.piso);
-    await this.esperar(700);
+    await esperar(700);
+    this.terminarTransformacion();
+  }
 
+  // Deja al gigante listo para pelear (al final del guion o de rescate si el
+  // guion se trabó): limpia temblores y respiraciones, cuerpo del gigante a
+  // su escala en el piso, sala en furia, vida llena y a pelear.
+  terminarTransformacion() {
+    const jefe = this.jefe;
+    const t = this.transfo || { limpiar: [] };
+    if (t.cancelado) return;
+    t.cancelado = true;
+    t.limpiar.forEach((f) => { try { f(); } catch (e) { /* ya no existía */ } });
+    if (this.respiracion) { this.respiracion.stop(); this.respiracion = null; }
+    this.tweens.killTweensOf(jefe);
+    this.fase = 'gigante';
+    if (!this.furia) this.fondoFuria();
+    jefe.anims.stop();
+    if (t.xBase !== undefined) jefe.x = t.xBase;
+    jefe.setTexture('jefeGigante', JEFE.gigante.caminar[0]).setScale(ESCALA).setAngle(0).setAlpha(1).clearTint();
+    this.ajustarCuerpoJefe();
+    jefe.body.setAllowGravity(true);
+    jefe.body.reset(jefe.x, ARENA.piso);
+    this.oscurecerSala(0.5, 600);
     this.vidaJefe = JEFE.gigante.vida;
     this.nombreJefe.setText('JEFE GIGANTE');
     this.actualizarBarra();
@@ -535,10 +753,97 @@ class JefeFinal extends Phaser.Scene {
     this.estado = 'pelea';
   }
 
+  // ---------------------------------------------------------------------------
+  // Ayudas de la transformación: que nunca quede quieto
+  // ---------------------------------------------------------------------------
+
+  // Un cuadro de la hoja del jefe normal durante `ms`.
+  async cuadroJefe(cuadro, ms) {
+    this.jefe.setTexture('jefe', cuadro);
+    if (ms) await this.esperar(ms);
+  }
+
+  // Punto del cuerpo: dx en fracción del alto hacia donde mira, alto en
+  // fracción desde los pies.
+  puntoJefe(dx, alto) {
+    const j = this.jefe;
+    const h = this.altoJefe();
+    return { x: j.x + (j.flipX ? -1 : 1) * dx * h, y: j.y - alto * h };
+  }
+
+  // Respiración: el pecho sube y baja. La escala Y se calcula cada cuadro a
+  // partir de la X, así sigue bien aunque crezca (crecerA tween de `scale`).
+  // Devuelve { stop() }; `agache` lo baja un momento (agacharse).
+  respirar(sprite, cuanto, ms) {
+    const r = { agache: 1 };
+    const desde = this.time.now;
+    const evento = this.time.addEvent({
+      delay: 16, loop: true, callback: () => {
+        if (!sprite.active) return;
+        const fase = Math.sin(((this.time.now - desde) / ms) * Math.PI);
+        sprite.scaleY = sprite.scaleX * (1 + cuanto * fase * fase) * r.agache;
+      }
+    });
+    r.stop = () => { evento.remove(); if (sprite.active) sprite.scaleY = sprite.scaleX; };
+    this.respiracionActual = r;
+    return r;
+  }
+
+  agacharse(sprite, cuanto, ms) {
+    const r = this.respiracionActual;
+    if (r) this.tweens.add({ targets: r, agache: 1 - cuanto, duration: ms, yoyo: true, ease: 'Quad.out' });
+  }
+
+  // Cabeceo al mascar: se inclina un poco.
+  cabecear(sprite, grados) {
+    this.tweens.add({ targets: sprite, angle: grados, duration: 85, yoyo: true, ease: 'Sine.inOut' });
+  }
+
+  // Hojitas de coca que saltan (de la ch'uspa o de la boca).
+  hojasCoca({ x, y }, cantidad, velocidad) {
+    const p = this.add.particles(x, y, 'fx_chispa', {
+      speed: { min: velocidad * 0.4, max: velocidad }, angle: { min: 200, max: 340 }, gravityY: 500,
+      lifespan: 700, rotate: { min: 0, max: 360 }, scale: { start: 2.2, end: 1 }, tint: [0x3f9a2e, 0x6ac040, 0x2e7a22],
+      emitting: false
+    }).setDepth(11);
+    p.explode(cantidad);
+    this.time.delayedCall(800, () => p.destroy());
+  }
+
+  // Jirones de la ropa que se rompe al inflarse.
+  jironesRopa({ x, y }) {
+    const p = this.add.particles(x, y, 'fx_chispa', {
+      speed: { min: 80, max: 200 }, angle: { min: 180, max: 360 }, gravityY: 600, lifespan: 800,
+      rotate: { min: 0, max: 360 }, scale: { start: 2.6, end: 1.4 }, tint: [0xe8e8e0, 0x2a2e28, 0x3a4a5a], emitting: false
+    }).setDepth(11);
+    p.explode(6);
+    this.time.delayedCall(900, () => p.destroy());
+  }
+
+  // Anillo de energía que se abre desde los pies.
+  anilloAura(x, y, color, fuerza = 1) {
+    const anillo = this.add.ellipse(x, y, 40, 10, color, 0).setStrokeStyle(3 + fuerza, color, 0.9)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(9.45);
+    this.tweens.add({ targets: anillo, scaleX: 6 + fuerza * 3, scaleY: 4 + fuerza * 2, alpha: 0, duration: 500 + fuerza * 150,
+      ease: 'Quad.out', onComplete: () => anillo.destroy() });
+  }
+
+  // Estela: una copia del cuadro actual que se agranda y se desvanece.
+  estelaJefe(color) {
+    const j = this.jefe;
+    const copia = this.add.image(j.x, j.y, j.texture.key, j.frame.name).setOrigin(j.originX, j.originY)
+      .setFlipX(j.flipX).setScale(j.scaleX, j.scaleY).setTintFill(color).setAlpha(0.55)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(j.depth - 0.05);
+    this.tweens.add({ targets: copia, scaleX: j.scaleX * 1.18, scaleY: j.scaleY * 1.12, alpha: 0, duration: 380, ease: 'Quad.out',
+      onComplete: () => copia.destroy() });
+  }
+
   // Fase 2: la sala queda tenebrosa: casi a oscuras y teñida de rojo sangre,
   // con niebla baja, brasas que suben, el rojo que late, y tormenta (rayos de
   // fondo con relámpago) y temblores cada tanto.
   fondoFuria() {
+    if (this.furia) return;
+    this.furia = true;
     const { width, height } = this.scale;
     // El fondo (y el trufi estacionado) pasan de su color a rojo muy oscuro.
     const tinte = { t: 0 };
@@ -580,7 +885,8 @@ class JefeFinal extends Phaser.Scene {
     }).setDepth(2);
     // Tormenta: relámpago con rayos de fondo y temblor cada tanto.
     const tormenta = () => {
-      if (this.estado === 'fin') return;
+      // Solo durante la pelea (en la huida y la salida ya no).
+      if (!['pelea', 'transformacion'].includes(this.estado)) return;
       this.cameras.main.flash(110, 150, 60, 60);
       this.cameras.main.shake(220, 0.005);
       const x = Phaser.Math.Between(60, width - 60);
@@ -622,6 +928,7 @@ class JefeFinal extends Phaser.Scene {
     const atras = jefe.flipX ? 1 : -1;
     const xFinal = Phaser.Math.Clamp(jefe.x + atras * g.vuelo.atras, ARENA.izquierda + 120, ARENA.derecha - 120);
 
+    sonarSfx(this, 'muerteEnemigo'); // Armas.js
     // 1. El balazo final: pausa de golpe (todo se congela un instante), zoom,
     //    destellos blancos y una ráfaga corta de explosiones encima.
     jefe.setFrame(cuadro(0)).setTintFill(0xffffff);
@@ -642,10 +949,23 @@ class JefeFinal extends Phaser.Scene {
     cam.zoomTo(1, 260, 'Quad.easeInOut', true);
     cam.flash(160, 255, 250, 230);
 
-    // 2. Se tambalea y sale volando de espaldas en arco (cuadros 1-4).
+    // 2. Se tambalea (se mece de un lado al otro) y sale volando de espaldas
+    //    en arco (cuadros 1-4), girando hacia atrás y dejando una estela.
     const t = g.muerteTiempos;
     jefe.setFrame(cuadro(1));
+    this.tweens.add({ targets: jefe, angle: { from: -6, to: 6 }, duration: t[0] / 2, yoyo: true, ease: 'Sine.inOut' });
     await this.esperar(t[0]);
+    jefe.setAngle(0);
+    this.tweens.add({ targets: jefe, angle: atras * 28, duration: (t[1] + t[2]) * 1.1, ease: 'Quad.out' });
+    this.tweens.add({ targets: jefe, scaleX: ESCALA * 1.06, scaleY: ESCALA * 0.94, duration: 120, yoyo: true });
+    const estela = this.time.addEvent({
+      delay: 35, repeat: 9, callback: () => {
+        const copia = this.add.image(jefe.x, jefe.y, jefe.texture.key, jefe.frame.name).setOrigin(jefe.originX, jefe.originY)
+          .setScale(jefe.scaleX, jefe.scaleY).setFlipX(jefe.flipX).setAngle(jefe.angle).setDepth(jefe.depth - 0.01)
+          .setTintFill(0xffe0a0).setAlpha(0.45);
+        this.tweens.add({ targets: copia, alpha: 0, duration: 220, onComplete: () => copia.destroy() });
+      }
+    });
     const vuelo = t[1] + t[2] + t[3];
     this.tweens.add({ targets: jefe, x: xFinal, duration: vuelo + t[4] * 0.5, ease: 'Quad.out' });
     this.tweens.add({
@@ -658,7 +978,12 @@ class JefeFinal extends Phaser.Scene {
     }
 
     // 3. Aterriza: golpe seco, polvo, piedras, rebote chico y se arrastra.
+    estela.remove();
+    this.tweens.killTweensOf(jefe);
+    jefe.setAngle(0).setScale(ESCALA);
     jefe.setY(ARENA.piso).setFrame(cuadro(5));
+    // Se aplasta contra el piso y vuelve.
+    this.tweens.add({ targets: jefe, scaleY: ESCALA * 0.85, scaleX: ESCALA * 1.1, duration: 80, yoyo: true, ease: 'Quad.out' });
     cam.shake(320, 0.016);
     this.polvoAterrizaje(jefe.x);
     chispas(this, jefe.x - 50, ARENA.piso - 4, 18, -150, 50, 11);
@@ -675,10 +1000,28 @@ class JefeFinal extends Phaser.Scene {
     await this.esperar(t[6]);
     jefe.setFrame(cuadro(8));
     this.tweens.add({ targets: this.sombraJefe, scaleX: 2.6, duration: 300 });
+    // Tendido no queda quieto: respira agitado, se le escapa humito y cada
+    // tanto patalea (un tirón) y vuelve a las estrellitas.
+    this.tweens.add({ targets: jefe, scaleY: ESCALA * 1.04, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.time.addEvent({
+      delay: 900, loop: true, callback: () => {
+        if (!jefe.active) return;
+        jefe.setFrame(jefe.frame.name === cuadro(8) ? cuadro(7) : cuadro(8));
+        this.tweens.add({ targets: jefe, angle: { from: 0, to: atras * -3 }, duration: 90, yoyo: true });
+        const humo = this.add.particles(jefe.x, jefe.y - 30, 'fx_humo', {
+          speedY: { min: -60, max: -25 }, speedX: { min: -15, max: 15 }, lifespan: 900,
+          scale: { start: 1, end: 2.6 }, alpha: { start: 0.45, end: 0 }, tint: 0x9a9a9a, emitting: false
+        }).setDepth(9.6);
+        humo.explode(3);
+        this.time.delayedCall(1000, () => humo.destroy());
+      }
+    });
 
     this.jugador.setVelocityX(0);
     sumarPuntos(this, 10000);
-    misionCompleta(this); // Estado.js: ¡MISIÓN COMPLETA! y la tabla de puntaje
+    // No gana todavía: se escapa en el helicóptero del Coronel Buitre
+    // (EscapeCutscene.js). MISIÓN COMPLETA al salir de la base por la derecha.
+    this.escapeCutscene();
   }
 
   // ---------------------------------------------------------------------------
@@ -728,7 +1071,7 @@ class JefeFinal extends Phaser.Scene {
     const velocidad = JUGADOR.velocidad * (this.agachado ? JUGADOR.agachado : corre ? JUGADOR.corrida : 1);
     if (this.time.now > this.golpeHasta) j.setVelocityX(direccion * velocidad);
     if (direccion) j.setFlipX(direccion < 0);
-    if (saltar && enSuelo && !this.saltoPresionado) j.setVelocityY(-JUGADOR.salto);
+    if (saltar && enSuelo && !this.saltoPresionado) { j.setVelocityY(-JUGADOR.salto); sonarSfx(this, 'salto'); }
     this.saltoPresionado = saltar;
 
     if (dispara && this.time.now >= this.proximoDisparo) this.disparar();
@@ -743,20 +1086,48 @@ class JefeFinal extends Phaser.Scene {
     this.sombraJugador.setPosition(j.body.center.x, ARENA.piso - 1).setScale(f).setAlpha(f);
     if (this.jefe) this.sombraJefe.setPosition(this.jefe.x, ARENA.piso - 1);
     // La luz del velo (oscurecerSala) acompaña al jefe, suave.
-    if (this.velo && this.jefe) this.velo.x += (this.jefe.x - this.velo.x) * 0.08;
+    if (this.velo && this.jefe && ['pelea', 'transformacion'].includes(this.estado)) this.velo.x += (this.jefe.x - this.velo.x) * 0.08;
   }
 
   update() {
     const j = this.jugador;
     if (this.estado === 'entrada' && j.x >= 200) this.llegadaJefe();
     const admin = noclipJugador(this); // modo admin (Admin.js)
-    if (admin) { /* vuela en noclip */ } else if (this.estado === 'pelea' || this.estado === 'transformacion' || this.estado === 'fin') this.moverJugador();
+    if (admin) { /* vuela en noclip */ } else if (['pelea', 'transformacion', 'fin'].includes(this.estado)) this.moverJugador();
     else cerrarSelector(this, false); // Armas.js: sin cámara lenta fuera de la pelea
+    // Al terminar la huida del jefe (EscapeCutscene.js) es MISIÓN COMPLETA directo.
     this.moverJefe();
+    this.bloquearContraJefe();
     this.moverBalas();
     this.actualizarSombras();
+  }
+
+  // El jugador no atraviesa al jefe (normal o gigante): en el piso se queda
+  // pegado al lado por donde llegó (casi siempre a su izquierda) en vez de
+  // pasarle por delante. Saltando por encima de su cabeza sí pasa.
+  bloquearContraJefe() {
+    const jefe = this.jefe;
+    if (!jefe || !jefe.body || !jefe.body.enable || !['pelea', 'transformacion'].includes(this.estado)) return;
+    if (noclipJugador(this)) return; // modo admin
+    const a = this.jugador.body;
+    const b = jefe.body;
+    const dx = a.center.x - b.center.x;
+    // Distancia mínima entre centros: los dos cuerpos y un margen (el dibujo
+    // del gigante es más ancho que su caja).
+    const margen = this.fase === 'gigante' ? 18 : 6;
+    const minimo = a.width / 2 + b.width / 2 + margen;
+    const separados = Math.abs(dx) >= minimo || a.bottom <= b.top + 12 || a.top >= b.bottom;
+    if (separados) {
+      if (Math.abs(dx) >= minimo) this.ladoContraJefe = Math.sign(dx) || -1;
+      return;
+    }
+    const lado = this.ladoContraJefe || (Math.sign(dx) || -1);
+    a.x = b.center.x + lado * minimo - a.width / 2;
+    if (Math.sign(a.velocity.x) === -lado) a.velocity.x = 0;
   }
 }
 
 // Movimiento, animación, disparos y golpes del jugador (Jugador.js).
 Object.assign(JefeFinal.prototype, AccionesJugador);
+// Carteles chicos sobre el jefe (¡ÑAC ÑAC!, ¡GRRR!...): los de Nivel1.
+JefeFinal.prototype.aviso = Nivel1.prototype.aviso;

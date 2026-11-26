@@ -12,9 +12,15 @@
   <link rel="icon" href="data:,">
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
-    #juego { width: 100vw; height: 100vh; background: #000; }
-    canvas { display: block; image-rendering: pixelated; }
+    /* Celular: la página queda fija (sin scroll ni rebote) y el juego ocupa solo
+       lo que se ve. 100vh en el celular incluye la barra del navegador y cortaba
+       la pantalla; position: fixed + inset: 0 usa el área visible real. */
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden;
+      position: fixed; inset: 0; overscroll-behavior: none; touch-action: manipulation;
+      -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    #juego { position: fixed; inset: 0; width: 100%; height: 100%; height: 100dvh; background: #000;
+      overflow: hidden; touch-action: none; }
+    canvas { display: block; image-rendering: pixelated; touch-action: none; }
 
     /* Controles táctiles (src/Tactil.js): solo con la clase .tactil */
     html.tactil, html.tactil body { touch-action: none; -webkit-user-select: none; user-select: none;
@@ -45,15 +51,56 @@
     #tactil .salto { right: calc(26px + 26vh + env(safe-area-inset-right)); bottom: 12px; }
     #tactil .arma { right: calc(18px + 4vh + env(safe-area-inset-right)); bottom: calc(26vh + 30px);
       width: 14vh; height: 14vh; max-width: 70px; max-height: 70px; font-size: 7px; }
+    /* Dinamita (K): la mina (Tuneles, MineCartScene) */
+    #tactil .tnt { right: calc(34px + 22vh + env(safe-area-inset-right)); bottom: calc(22vh + 34px);
+      width: 14vh; height: 14vh; max-width: 70px; max-height: 70px; font-size: 7px; border-color: rgba(255,90,60,0.55); }
     #tactil .mini { width: 11vh; height: 11vh; max-width: 54px; max-height: 54px; border-radius: 12px; font-size: 8px; top: 10px; }
     #tactil .pausa { right: calc(14px + env(safe-area-inset-right)); }
     #tactil .ok { right: calc(24px + 11vh + env(safe-area-inset-right)); }
+    #tactil .completa { right: calc(34px + 22vh + env(safe-area-inset-right)); }
+    #tactil .completa svg { width: 55%; height: 55%; }
+    #tactil .completa.ya { display: none; }
+    #tactil .aviso-completa { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 12;
+      width: min(440px, 86vw); padding: 16px 18px; box-sizing: border-box; text-align: center; font-size: 10px;
+      line-height: 1.9; color: #fff6d0; background: rgba(12,10,8,0.94); border: 3px solid #ffd23f;
+      box-shadow: 0 0 0 3px #000; pointer-events: auto; display: none; }
+    #tactil .aviso-completa b { color: #ffd23f; }
     #tactil .girar { display: none; position: fixed; inset: 0; pointer-events: auto; background: #000;
       align-items: center; justify-content: center; flex-direction: column; text-align: center;
       font-size: 12px; line-height: 2; color: #ffd23f; }
     #tactil .girar .icono { font-size: 48px; animation: girar 1.6s ease-in-out infinite; }
     @keyframes girar { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
     @media (orientation: portrait) { html.tactil #tactil .girar { display: flex; } }
+
+    /* Multijugador (src/Red.js): lobby y avisos */
+    #red-lobby { display: none; position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,0.72);
+      align-items: center; justify-content: center; font-family: 'Press Start 2P', monospace; color: #fff6d0; }
+    #red-lobby .panel { width: min(420px, 92vw); max-height: 94vh; overflow-y: auto; box-sizing: border-box;
+      padding: 18px 20px; background: #14120c; border: 3px solid #ffd23f; box-shadow: 0 0 0 3px #000, 0 8px 30px #000;
+      display: flex; flex-direction: column; gap: 12px; text-align: center; }
+    #red-lobby h1 { margin: 0 0 4px; font-size: 18px; color: #ffd23f; text-shadow: 2px 2px 0 #6a3a00; }
+    #red-lobby .paso { display: flex; flex-direction: column; gap: 10px; }
+    #red-lobby label { display: flex; flex-direction: column; gap: 6px; font-size: 9px; color: #c8c0a0; }
+    #red-lobby input { font: 16px 'Press Start 2P', monospace; padding: 10px; text-align: center; text-transform: uppercase;
+      background: #000; color: #ffd23f; border: 2px solid #5a5e50; outline: none; }
+    #red-lobby input:focus { border-color: #ffd23f; }
+    #red-lobby button { font: 12px 'Press Start 2P', monospace; padding: 12px; cursor: pointer; color: #1a0e04;
+      background: linear-gradient(#ffe466, #e9a51e); border: 2px solid #000; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
+    #red-lobby button:active { transform: translateY(2px); }
+    #red-lobby button:disabled { filter: grayscale(1) brightness(0.6); cursor: default; }
+    #red-lobby button.bots { background: linear-gradient(#ff9a7a, #d8452e); color: #fff6d0; text-shadow: 1px 1px 0 #000; }
+    #red-lobby button.secundario { background: #2a2618; color: #c8c0a0; border-color: #5a5e50; font-size: 9px; }
+    #red-lobby .o { font-size: 8px; color: #7a7460; }
+    #red-lobby .cod { font-size: 12px; }
+    #red-lobby .cod b { display: block; margin-top: 8px; font-size: 34px; letter-spacing: 8px; color: #ffd23f; }
+    #red-lobby .ayuda, #red-lobby .espera { font-size: 8px; color: #9a9480; line-height: 1.6; }
+    #red-lobby .lista { list-style: none; margin: 0; padding: 0; font-size: 11px; line-height: 2; }
+    #red-lobby .lista small { font-size: 7px; color: #9a9480; }
+    #red-lobby .error { font-size: 8px; color: #ff6a5a; line-height: 1.6; min-height: 1px; }
+    .red-aviso { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30;
+      font: 10px 'Press Start 2P', monospace; color: #ffd23f; background: rgba(0,0,0,0.75); padding: 8px 12px;
+      border: 2px solid #ffd23f; transition: opacity 0.5s; pointer-events: none; }
+    .red-aviso.fuera { opacity: 0; }
   </style>
 </head>
 <body>
@@ -67,18 +114,33 @@
   <script src="src/scenes/CharacterSelectScene.js"></script>
   <script src="src/scenes/TerrenoNatural.js"></script>
   <script src="src/Efectos.js"></script>
+  <script src="src/Luces.js"></script>
   <script src="src/Armas.js"></script>
   <script src="src/Jugador.js"></script>
   <script src="src/Admin.js"></script>
-  <script src="src/CuerpoTuto.js"></script>
+  <script src="src/CuerpoModular.js"></script>
+  <script src="src/Companero.js"></script>
   <script src="src/Estado.js"></script>
   <script src="src/scenes/Nivel1.js"></script>
+  <script src="src/scenes/Cinematica.js"></script>
+  <script src="src/IntroLevel.js"></script>
   <script src="src/Soldados.js"></script>
+  <script src="src/Garroteros.js"></script>
   <script src="src/scenes/Interior.js"></script>
   <script src="src/scenes/Cueva.js"></script>
   <script src="src/scenes/JefeFinal.js"></script>
+  <script src="src/scenes/Nivel2.js"></script>
+  <script src="src/scenes/Patio.js"></script>
+  <script src="src/scenes/Subida.js"></script>
+  <script src="src/scenes/Tuneles.js"></script>
+  <script src="src/scenes/MineCartScene.js"></script>
+  <script src="src/scenes/CavernaJefe.js"></script>
+  <script src="src/scenes/PersecucionJefe.js"></script>
+  <script src="src/EscapeCutscene.js"></script>
   <script src="src/scenes/Pausa.js"></script>
+  <script src="src/scenes/Arena.js"></script>
   <script src="src/Tactil.js"></script>
+  <script src="src/Red.js"></script>
   <script src="src/main.js"></script>
 </body>
 </html>

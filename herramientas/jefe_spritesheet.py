@@ -46,7 +46,7 @@ import json
 from PIL import Image
 
 from recorte_sprites import (a_pixel_art, centro_pies, componentes, distancia_cajas, en_celdas,
-                             por_manchas, quitar_fondo)
+                             por_manchas, quitar_fondo, sin_tinte_magenta)
 
 CARPETA = 'assets/jefes/'
 ALTO_JEFE = 58        # px de arte del jefe normal parado: como el soldado
@@ -195,8 +195,41 @@ def por_figuras(img, cuadros_por_fila, minimo=2000, cortes_a_mano=()):
     return cuadros
 
 
-def abrir(nombre, recorte_abajo=0, borde=0):
-    img = quitar_fondo(Image.open(CARPETA + nombre))
+def es_magenta_puro(r, g, b):
+    """El fondo de verdad: magenta brillante (el violeta de la wiphala,
+    ~(199, 33, 195), no llega)."""
+    return r > 205 and b > 205 and g < 80
+
+
+def quitar_fondo_sin_wiphala(img, borde=2):
+    """Como quitar_fondo, pero el violeta parecido al magenta solo se borra
+    pegado (a `borde` px) al magenta puro del fondo: los cuadros violetas de la
+    wiphala quedaban transparentes y la bandera se veía hueca."""
+    from recorte_sprites import es_fondo
+    rgba = img.convert('RGBA')
+    px = rgba.load()
+    w, h = rgba.size
+    puro = [[es_magenta_puro(*px[x, y][:3]) for x in range(w)] for y in range(h)]
+    cerca = [[False] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            if puro[y][x]:
+                for yy in range(max(0, y - borde), min(h, y + borde + 1)):
+                    fila = cerca[yy]
+                    for xx in range(max(0, x - borde), min(w, x + borde + 1)):
+                        fila[xx] = True
+    for y in range(h):
+        for x in range(w):
+            r, g, b, _ = px[x, y]
+            if puro[y][x] or (cerca[y][x] and es_fondo(r, g, b)):
+                px[x, y] = (0, 0, 0, 0)
+    return sin_tinte_magenta(rgba)
+
+
+def abrir(nombre, recorte_abajo=0, borde=0, wiphala=False):
+    """wiphala: la hoja trae la bandera (su violeta se cuida al quitar el fondo)."""
+    original = Image.open(CARPETA + nombre)
+    img = quitar_fondo_sin_wiphala(original) if wiphala else quitar_fondo(original)
     return img.crop((borde, borde, img.width - borde, img.height - recorte_abajo - borde))
 
 
@@ -258,6 +291,69 @@ def alto_cuerpo(cuadro, cubierto=0.3):
     return cuadro.height
 
 
+def deshilachar_cortes(cuadro, ancho=22, semilla=11):
+    """Donde la figura toca el borde del recorte (el marco de la grilla la
+    cortó en recto: banderas, pies), se borran píxeles al azar cerca de ese
+    borde, más cuanto más cerca: el corte queda irregular, no una línea."""
+    import random
+    azar = random.Random(semilla)
+    px = cuadro.load()
+    w, h = cuadro.size
+    toca = {
+        'izq': any(px[0, y][3] for y in range(h)), 'der': any(px[w - 1, y][3] for y in range(h)),
+        'arr': any(px[x, 0][3] for x in range(w)),
+        # Abajo están los pies (y el piso): un borde recto ahí es correcto y
+        # deshilachado les faltaban píxeles a las botas.
+        'aba': False,
+    }
+    for y in range(h):
+        for x in range(w):
+            if not px[x, y][3]:
+                continue
+            d = min([v for k, v in (('izq', x), ('der', w - 1 - x), ('arr', y), ('aba', h - 1 - y)) if toca[k]] or [ancho])
+            if d < ancho and azar.random() > (d / ancho) ** 0.8:
+                px[x, y] = (0, 0, 0, 0)
+    return cuadro
+
+
+def solo_figura(cuadro):
+    """Deja la mancha más grande (el cuerpo) y borra lo suelto (restos de la
+    bandera del cuadro vecino)."""
+    grandes, chicas = componentes(cuadro, 1)
+    mayor = max(grandes, key=lambda m: m[0])
+    limpio = Image.new('RGBA', cuadro.size)
+    origen, destino = cuadro.load(), limpio.load()
+    for x, y in mayor[2]:
+        destino[x, y] = origen[x, y]
+    return limpio.crop(limpio.getbbox())
+
+
+def centro_botas(cuadro):
+    """x promedio de lo oscuro (las botas) de las filas de abajo: el polvo y
+    los destellos del golpe no corren el centro (con centro_pies, el puñete
+    de energía quedaba 40 px a la izquierda y el gigante saltaba de lugar)."""
+    px = cuadro.load()
+    w, h = cuadro.size
+    xs = [x for y in range(int(h * 0.9), h) for x in range(w) if px[x, y][3] and sum(px[x, y][:3]) < 200]
+    return sum(xs) / len(xs) if xs else w / 2
+
+
+def desvanecer_derecha(cuadro, ancho=90, semilla=3):
+    """El borde derecho cortado en recto por el borde de la lámina (la estela
+    del puñete): se borran píxeles al azar, más cuanto más a la derecha, y la
+    estela termina deshilachada (un alfa en rampa lo volvía a dejar recto al
+    pasar a pixel art)."""
+    import random
+    azar = random.Random(semilla)
+    px = cuadro.load()
+    w, h = cuadro.size
+    for y in range(h):
+        for x in range(max(0, w - ancho), w):
+            if px[x, y][3] and azar.random() < ((x - (w - ancho)) / ancho) ** 1.5:
+                px[x, y] = (0, 0, 0, 0)
+    return cuadro
+
+
 def centro_carroceria(cuadro):
     grandes, _ = componentes(cuadro, 1)
     _, (x0, _, x1, _), _ = max(grandes, key=lambda m: m[0])
@@ -287,15 +383,26 @@ def armar_hoja(partes, centro=centro_pies):
 
 
 def main():
-    llegada = por_manchas(abrir('llegda_boss.jpeg', 4), 4000, 160, 20)
+    llegada = por_manchas(abrir('llegda_boss.jpeg', 4, wiphala=True), 4000, 160, 20)
     bus, poses = llegada[:6], llegada[7:]
-    caminar = por_figuras(abrir('walk_boss.jpeg'), [6, 6], cortes_a_mano=CORTES_A_MANO['walk_boss.jpeg'])
-    ataque = por_figuras(abrir('ataque_boss.jpeg'), [3, 3])
-    revive = en_celdas(abrir('revive_boss.jpeg'), 4, 2, 7)
-    gigante = en_celdas(abrir('boss.jpeg'), 2, 1, 8, 0.02)
+    caminar = por_figuras(abrir('walk_boss.jpeg', wiphala=True), [6, 6], cortes_a_mano=CORTES_A_MANO['walk_boss.jpeg'])
+    ataque = por_figuras(abrir('ataque_boss.jpeg', wiphala=True), [3, 3])
+    revive = en_celdas(abrir('revive_boss.jpeg', wiphala=True), 4, 2, 7)
+    # Las figuras de abajo tocan el marco: banderas y pies cortados en recto.
+    revive = [deshilachar_cortes(c) for c in revive]
+    gigante = en_celdas(abrir('boss.jpeg', wiphala=True), 2, 1, 8, 0.02)
     g_caminar = por_figuras(abrir('boss_camina.jpeg'), [3, 4], cortes_a_mano=CORTES_A_MANO['boss_camina.jpeg'])
+    # La lámina trae la bandera solo en 2 de los 7 cuadros (0 y 2): caminando
+    # aparecía y desaparecía, y el 1 tiene pegado un pedazo de la del vecino.
+    # Camina sin bandera (como ataca) con la fila de abajo: 4 cuadros, un ciclo.
+    g_caminar = [solo_figura(c) for c in g_caminar[3:]]
     # Sin marco: cada cuadro es una mancha (el borde de la hoja trae una línea).
     g_ataque = por_manchas(abrir('boss_ataque.jpeg', borde=5), 3000, 190, 40)
+    # La lámina está apretada: la estela del puñete (2) toca el borde derecho
+    # y la vuelta a la guardia (7) tiene la mano cortada. La estela se
+    # desvanece; la vuelta a la guardia es la guardia (0).
+    g_ataque[2] = desvanecer_derecha(g_ataque[2])
+    g_ataque[7] = g_ataque[0].copy()
     muerte = abrir('muerte_boss.jpeg')
     g_muerte = en_cajas(muerte, cajas_muerte(muerte))
     # Aterriza y se arrastra: nubes de polvo cortadas por el marco.
@@ -328,7 +435,8 @@ def main():
                      **{n: [i, i + len(p[0]) - 1] for n, i, p in zip(['pose', 'caminar', 'ataque', 'revive'], inicios, partes)}}
 
     partes = [(gigante, e_gigante), (g_caminar, e_g_caminar), (g_ataque, e_g_ataque), (g_muerte, e_g_muerte)]
-    hoja, celda, inicios = armar_hoja(partes)
+    del_ataque = {id(c) for c in g_ataque}
+    hoja, celda, inicios = armar_hoja(partes, lambda c: centro_botas(c) if id(c) in del_ataque else centro_pies(c))
     hoja.save(CARPETA + 'jefe_gigante_sheet.png')
     datos['gigante'] = {'ancho': celda[0], 'alto': celda[1],
                         **{n: [i, i + len(p[0]) - 1] for n, i, p in zip(['aparece', 'caminar', 'ataque', 'muerte'], inicios, partes)}}

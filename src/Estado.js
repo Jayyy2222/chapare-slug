@@ -24,6 +24,7 @@ function nuevaPartida(registry) {
   registry.set('powerupsTotal', 0);
   registry.set('inicioMision', Date.now());
   registry.set('reaparecer', false);
+  registry.remove('tioCheckpoint'); // (CavernaJefe: reaparecer en la persecución)
 }
 
 function vidasPartida(escena) {
@@ -69,11 +70,12 @@ function hudVidas(escena) {
   const x = VIDA.x + 196;
   const y = VIDA.y + 22;
   const textura = texturaJugador(escena);
-  if (textura === 'jugadorTuto') animacionesTuto(escena); // CuerpoTuto.js: los cuadros de sus hojas
+  const prefijo = CUERPOS[personajeCuerpo(escena)].prefijo;
+  animacionesCuerpo(escena, personajeCuerpo(escena)); // CuerpoModular.js: los cuadros de sus hojas
   // La cabeza del personaje, entera: se busca leyendo los píxeles del cuadro
   // de parado (la franja de arriba de lo que no es transparente) y se recorta
   // con un poco de margen. Va a ~26 px de alto, centrada en (x, y).
-  const [clave, cuadro] = textura === 'jugadorTuto' && escena.textures.exists('tuto_idle') ? ['tuto_idle', '0'] : [textura, 0];
+  const [clave, cuadro] = escena.textures.exists(prefijo + 'idle') ? [prefijo + 'idle', '0'] : [textura, 0];
   const cara = escena.add.image(x, y, clave, cuadro);
   const w = cara.frame.width;
   const h = cara.frame.height;
@@ -352,7 +354,7 @@ class GameOver extends Phaser.Scene {
     TextFX.title(this, width / 2, height / 2 + 10, `PUNTAJE  ${this.registry.get('puntos') || 0}`, { escala: 3 });
     TextFX.menu(this, width / 2, height / 2 + 60, `REHENES  ${this.registry.get('rehenesTotal') || 0}`, { escala: 3 });
     this.time.delayedCall(3000, () => {
-      ['JefeFinal', 'Cueva', 'Interior', 'Nivel1'].forEach((k) => {
+      ['CavernaJefe', 'MineCartScene', 'Tuneles', 'Subida', 'Patio', 'Nivel2', 'JefeFinal', 'Cueva', 'Interior', 'Nivel1'].forEach((k) => {
         if (this.scene.isActive(k) || this.scene.isPaused(k) || this.scene.isSleeping(k)) this.scene.stop(k);
       });
       this.scene.start('Menu');
@@ -407,9 +409,17 @@ class Resultado extends Phaser.Scene {
     this.teclas = (ev) => {
       if (!this.listo || ev.repeat || (ev.code !== 'Enter' && ev.code !== 'Space')) return;
       sonidoUI(this, 'confirma');
-      ['JefeFinal', 'Cueva', 'Interior', 'Nivel1'].forEach((k) => {
+      ['CavernaJefe', 'MineCartScene', 'Tuneles', 'Subida', 'Patio', 'Nivel2', 'JefeFinal', 'Cueva', 'Interior', 'Nivel1'].forEach((k) => {
         if (this.scene.isActive(k) || this.scene.isPaused(k) || this.scene.isSleeping(k)) this.scene.stop(k);
       });
+      // Terminado el Nivel 1 (su jefe final) sigue el Nivel 2, Potosí, con el
+      // mismo puntaje y las mismas vidas.
+      if (['JefeFinal', 'Nivel1'].includes(this.clave)) {
+        ['Nivel2Base', 'PatioBase', 'SubidaBase'].forEach((k) => this.registry.remove(k));
+        this.registry.set('rehenes', 0);
+        this.scene.start('Nivel2');
+        return;
+      }
       this.scene.start('Menu');
     };
     window.addEventListener('keydown', this.teclas);

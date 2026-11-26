@@ -19,7 +19,7 @@ const config = {
     arcade: { gravity: { y: 800 }, debug: false }
   },
   // CapaSelector (Armas.js): la rueda del selector de armas, encima de todo.
-  scene: [Menu, CharacterSelectScene, Nivel1, Interior, Cueva, JefeFinal, CapaSelector, Pausa, GameOver, Resultado]
+  scene: [Menu, CharacterSelectScene, Cinematica, Nivel1, Interior, Cueva, JefeFinal, Nivel2, Patio, Subida, Tuneles, MineCartScene, CavernaJefe, Arena, CapaSelector, Pausa, GameOver, Resultado]
 };
 
 // Para probar una escena suelta: index.html?escena=Cueva arranca directo en ella.
@@ -39,3 +39,50 @@ Promise.race([fuentes, espera]).catch(() => {}).finally(() => {
   window.juego = new Phaser.Game(config);
   window.juego.sound.volume = AJUSTES.general; // Pausa.js: el volumen guardado
 });
+
+// =============================================================================
+// Celular: que el juego siempre entre completo y el navegador no haga zoom.
+// =============================================================================
+(function pantallaCelular() {
+  // Al girar el celular, mostrar/ocultar la barra del navegador, cerrar el
+  // teclado o entrar a pantalla completa, el área visible cambia de tamaño
+  // (a veces sin avisar con 'resize'): se vuelve a ajustar el canvas.
+  let pendiente = null;
+  function ajustar() {
+    clearTimeout(pendiente);
+    pendiente = setTimeout(() => {
+      // iOS deja la página corrida hacia arriba después de cerrar el teclado.
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+      if (window.juego && window.juego.scale) window.juego.scale.refresh();
+    }, 60);
+  }
+  function ajustarVarias() { ajustar(); setTimeout(ajustar, 300); setTimeout(ajustar, 800); }
+  window.addEventListener('resize', ajustar);
+  window.addEventListener('orientationchange', ajustarVarias);
+  if (screen.orientation) screen.orientation.addEventListener('change', ajustarVarias);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', ajustar);
+    window.visualViewport.addEventListener('scroll', ajustar);
+  }
+  document.addEventListener('fullscreenchange', ajustarVarias);
+  document.addEventListener('webkitfullscreenchange', ajustarVarias);
+  document.addEventListener('focusout', ajustarVarias); // se cerró el teclado
+  window.addEventListener('pageshow', ajustarVarias);
+
+  // Sin zoom: pellizco con dos dedos (Safari ignora user-scalable=no) ni doble toque.
+  const sinZoom = (e) => e.preventDefault();
+  document.addEventListener('gesturestart', sinZoom);
+  document.addEventListener('gesturechange', sinZoom);
+  document.addEventListener('gestureend', sinZoom);
+  document.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 1 || (e.scale !== undefined && e.scale !== 1)) e.preventDefault();
+  }, { passive: false });
+  let ultimoToque = 0;
+  document.addEventListener('touchend', (e) => {
+    const ahora = Date.now();
+    const enCampo = e.target.closest && e.target.closest('input, textarea, button, select');
+    if (!enCampo && ahora - ultimoToque < 350) e.preventDefault();
+    ultimoToque = ahora;
+  }, { passive: false });
+  document.addEventListener('dblclick', sinZoom);
+}());

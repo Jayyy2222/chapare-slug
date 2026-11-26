@@ -1,6 +1,6 @@
 // =============================================================================
 // Menú de pausa: ESC o P en cualquier escena del juego (Nivel1, Interior, Cueva,
-// JefeFinal) la pausa y abre este menú encima:
+// JefeFinal, Arena) la pausa y abre este menú encima:
 //   CONTINUAR       vuelve al juego (también con ESC)
 //   REINICIAR NIVEL  reinicia la escena en la que se está
 //   CONTROLES       las teclas del juego
@@ -10,7 +10,7 @@
 // cambiar los ajustes. Los ajustes se guardan en el navegador (localStorage).
 // =============================================================================
 
-const ESCENAS_JUEGO = ['JefeFinal', 'Cueva', 'Interior', 'Nivel1'];
+const ESCENAS_JUEGO = ['CavernaJefe', 'MineCartScene', 'Tuneles', 'Subida', 'Patio', 'Nivel2', 'JefeFinal', 'Cueva', 'Interior', 'Nivel1', 'Arena'];
 
 const AJUSTES = { musica: 1, general: 1, ...leerAjustes() };
 

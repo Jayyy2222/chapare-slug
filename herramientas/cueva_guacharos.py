@@ -190,6 +190,32 @@ def rocas(img):
     print(f'cueva_rocas.png {hoja.size}')
 
 
+def sin_halo(img):
+    """El halo violeta que el magenta del jpeg deja en el borde de la roca (en
+    el juego se veía como rayos violeta detrás de la cueva): el tinte violeta
+    (rojo y azul por encima del verde) se baja al verde, y la fila de píxeles
+    del borde que todavía tira a violeta se borra."""
+    px = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            exceso = min(r, b) - g
+            if a and exceso > 4:
+                px[x, y] = (r - exceso, g, b - exceso, a)
+    borde = []
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if not a or (r <= g + 6 and b <= g + 18):
+                continue
+            vecinos = ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
+            if any(0 <= vx < w and 0 <= vy < h and not px[vx, vy][3] for vx, vy in vecinos):
+                borde.append((x, y))
+    for x, y in borde:
+        px[x, y] = (0, 0, 0, 0)
+
+
 def franjas():
     im = Image.open(ORIGEN / 'img2.jpeg').convert('RGB')
     ancho, alto = im.size
@@ -217,6 +243,8 @@ def franjas():
                     r, b = m, m
                 datos.append((r, g, b, 255))
         franja.putdata(datos)
+        if nombre != 'cueva_cielo.png':  # el cielo no tiene magenta (su horizonte violeta es del dibujo)
+            sin_halo(franja)
         franja.save(DESTINO / nombre)
         print(f'{nombre} {ancho}x{y1 - y0}  (y {y0}-{y1} de img2)')
 

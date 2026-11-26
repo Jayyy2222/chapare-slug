@@ -8,6 +8,7 @@ assets/personajes/jugador/tuto/*.jpeg (sobre magenta, mirando a la derecha):
   aiming_straight_up.jpeg   4: de adelante a apuntar arriba (marca celeste)
   idle.jpeg                 6: cuerpo entero, quieto
   trepar.jpeg               6: cuerpo entero, de espaldas, trepando
+  muerte.jpeg              10 (2 filas): cuerpo entero, del susto al suelo
 Cada hoja está dibujada a otra escala: se llevan todas al tamaño del juego
 (la figura entera mide ALTO px de pantalla: va a escala 1, como las armas)
 con ESCALAS, medidas sobre la hebilla del cinturón y el largo de piernas y
@@ -35,6 +36,18 @@ from PIL import Image
 from aves_cueva import componentes, es_magenta, limpiar
 
 CARPETA = Path('assets/personajes/jugador/tuto')
+# Las hojas guardadas se llaman PREFIJO + hoja. FUENTES: el archivo (sin
+# .jpeg) de una hoja, si no se llama como ella. Otro personaje armado igual
+# (herramientas/manfred_cuerpo.py) cambia estos y HOJAS, SUELOS, ESPEJAR, CERCA.
+PREFIJO = 'tuto_'
+FUENTES = {}
+# Hebillas puestas a mano (si la detección falla en algún cuadro): por hoja,
+# {cuadro: (x, y)} en px del jpeg respecto del borde del cuadro recortado.
+HEBILLAS = {}
+# Cuadros de cuerpo entero con las piernas más cortas que las de las hojas de
+# piernas: por hoja, (filas, factor): las `filas` de abajo del jpeg (de la
+# cintura a la suela) se estiran a lo alto por `factor` antes de achicar.
+ESTIRAR = {}
 ALTO = 128  # px de pantalla de la figura entera (Manfred mide 124)
 
 # hoja: (escala, tipo, orden[, ancho]). tipo: 'piernas', 'torso' o 'entero'.
@@ -54,7 +67,25 @@ HOJAS = {
     'idle': (ALTO / 580, 'entero', 'x'),
     # De espaldas y con el brazo arriba: de la cabeza al pie mide 534 px.
     'trepar': (ALTO / 534, 'entero', 'x'),
+    # La cabeza mide 88 px (la del idle 149): misma escala de cabeza.
+    'muerte': (ALTO / 580 * 149 / 88, 'entero', 'suelos'),
 }
+
+# Hojas con el piso dibujado como sombras sueltas (no una línea entera): por
+# fila, la franja (y0, y1) de la sombra. Se borra, y el ancla de cada cuadro va
+# en el piso de su fila (no en su punto más bajo: así los cuadros en el aire
+# quedan en el aire). Con orden 'suelos' los cuadros van por fila y en x.
+SUELOS = {
+    'muerte': [(346, 358), (633, 643)],
+}
+# Cuadros dibujados mirando al revés que el resto (en muerte, 8 y 9 tienen la
+# cabeza a la derecha): se espejan.
+ESPEJAR = {
+    'muerte': [8, 9],
+}
+# Hasta cuántos px de un cuadro se le suman los pedacitos sueltos (en muerte,
+# las estrellitas que giran sobre la cabeza).
+CERCA = {'muerte': 60}
 
 
 def es_gris(r, g, b):
@@ -82,7 +113,7 @@ def partir(k, caja, ancho_normal):
 def cuadros(nombre, orden, tipo):
     """Cada cuadro: (imagen RGBA, caja en la hoja, hebilla (x, y) o None,
     mano (x, y) o None), en coordenadas de la imagen recortada."""
-    im = Image.open(CARPETA / f'{nombre}.jpeg').convert('RGB')
+    im = Image.open(CARPETA / f'{FUENTES.get(nombre, nombre)}.jpeg').convert('RGB')
     w, h = im.size
     px = im.load()
     m = [[not es_magenta(*px[x, y]) for x in range(w)] for y in range(h)]
@@ -93,6 +124,10 @@ def cuadros(nombre, orden, tipo):
         if negros > w * 0.6:
             for yy in range(max(0, y - 2), min(h, y + 3)):
                 m[yy] = [False] * w
+    suelos = SUELOS.get(nombre, [])
+    for y0, y1 in suelos:
+        for yy in range(y0, min(h, y1)):
+            m[yy] = [False] * w
     manchas = componentes(m, w, h)
     grandes = [k for k in manchas if len(k) > 3000]
     caja = lambda k: (min(p[0] for p in k), min(p[1] for p in k), max(p[0] for p in k) + 1, max(p[1] for p in k) + 1)
@@ -105,7 +140,7 @@ def cuadros(nombre, orden, tipo):
         x, y = k[0]
         d = [max(c[0] - x, x - c[2], 0) + max(c[1] - y, y - c[3], 0) for c in cajas]
         i = min(range(len(cajas)), key=lambda j: d[j])
-        if d[i] < 12:
+        if d[i] < CERCA.get(nombre, 12):
             grandes[i] = grandes[i] + k
     cajas = [caja(k) for k in grandes]
     anchos = sorted(c[2] - c[0] for c in cajas)
@@ -115,7 +150,11 @@ def cuadros(nombre, orden, tipo):
             a, b = partir(grandes[i], cajas[i], normal)
             grandes[i:i + 1] = [a, b]
     cajas = [caja(k) for k in grandes]
-    if orden == 'x':
+    # El piso de cada cuadro: la primera franja de sombra debajo de su borde de arriba.
+    piso = lambda c: next((i for i, (y0, _) in enumerate(suelos) if y0 >= c[1]), None)
+    if orden == 'suelos':
+        indices = sorted(range(len(grandes)), key=lambda i: (piso(cajas[i]), cajas[i][0]))
+    elif orden == 'x':
         indices = sorted(range(len(grandes)), key=lambda i: cajas[i][0])
     else:
         alto_medio = sum(c[3] - c[1] for c in cajas) / len(cajas)
@@ -150,8 +189,14 @@ def cuadros(nombre, orden, tipo):
             grises = [p for p in grises if p[1] < alto * 0.3]
         elif tipo == 'torso':
             grises = [p for p in grises if p[1] > alto * 0.75]
-        resultado.append((parte, cajas[i], hebilla(grises), mano))
-    return resultado
+        i_piso = piso(cajas[i]) if suelos else None
+        suelo = suelos[i_piso][0] - y0 if i_piso is not None else None
+        resultado.append((parte, cajas[i], hebilla(grises), mano, suelo))
+    for i, h in HEBILLAS.get(nombre, {}).items():
+        resultado[i] = (resultado[i][0], resultado[i][1], h, *resultado[i][3:])
+    espejar = ESPEJAR.get(nombre, [])
+    return [(r[0].transpose(Image.FLIP_LEFT_RIGHT), *r[1:]) if i in espejar else r
+            for i, r in enumerate(resultado)]
 
 
 def hebilla(grises):
@@ -193,15 +238,28 @@ def achicar(img, escala, ancho=1):
     return color
 
 
+def estirar_abajo(img, filas, factor):
+    """Las `filas` de abajo de la imagen, estiradas a lo alto por `factor`."""
+    w, h = img.size
+    corte = max(0, h - filas)
+    abajo = img.crop((0, corte, w, h)).resize((w, round((h - corte) * factor)), Image.NEAREST)
+    salida = Image.new('RGBA', (w, corte + abajo.height))
+    salida.paste(img.crop((0, 0, w, corte)), (0, 0))
+    salida.paste(abajo, (0, corte))
+    return salida
+
+
 def hoja(nombre, escala, tipo, orden, ancho=1):
     fuente = cuadros(nombre, orden, tipo)
     chicos, anclas, extras = [], [], []
     ultima = None
-    for parte, caja, heb, mano in fuente:
+    for parte, caja, heb, mano, suelo in fuente:
+        if nombre in ESTIRAR:
+            parte = estirar_abajo(parte, *ESTIRAR[nombre])
         c = achicar(parte, escala, ancho)
         if tipo == 'entero':
-            # Pies: abajo, en el medio.
-            ancla = (c.width / 2, c.height)
+            # Pies: abajo (o en el piso dibujado de la fila), en el medio.
+            ancla = (c.width / 2, suelo * escala if suelo is not None else c.height)
         else:
             # La hebilla (si en un cuadro no se encontró, la del anterior en la
             # misma posición relativa).
@@ -228,8 +286,8 @@ def hoja(nombre, escala, tipo, orden, ancho=1):
         if e['mano']:
             cuadro['mano'] = [round(dx + e['mano'][0]), round(dy + e['mano'][1])]
         datos['cuadros'].append(cuadro)
-    salida.save(CARPETA / f'tuto_{nombre}.png')
-    print(f'tuto_{nombre}.png: {len(chicos)} cuadros de {ancho}x{alto}, ancla {ox},{oy}')
+    salida.save(CARPETA / f'{PREFIJO}{nombre}.png')
+    print(f'{PREFIJO}{nombre}.png: {len(chicos)} cuadros de {ancho}x{alto}, ancla {ox},{oy}')
     return datos
 
 

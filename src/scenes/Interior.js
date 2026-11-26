@@ -78,6 +78,7 @@ class Interior extends Phaser.Scene {
   }
 
   preload() {
+    cargarSfxArmas(this); // Armas.js (solo lo que falta)
     this.load.image('interior_casa_destruida', 'assets/fondos/Interiores/casa_destruida.png');
     this.load.image('interior_choza', 'assets/fondos/Interiores/choza.png');
     this.load.image('interior_casa_ladrillo', 'assets/fondos/Interiores/casa_ladrillo.png');
@@ -122,7 +123,7 @@ class Interior extends Phaser.Scene {
     this.jugador = this.physics.add.sprite(px((s0 + s1) / 2), py(sAbajo) - 30 * ESCALA, texturaJugador(this), 0)
       .setScale(ESCALA).setDepth(10).setCollideWorldBounds(true);
     fisicaJugador(this.jugador); // Jugador.js: cuerpo, gravedad y caída
-    this.cuerpoTuto = cuerpoJugador(this); // piernas + torso de Tuto (CuerpoTuto.js) o null
+    this.cuerpoModular = cuerpoJugador(this); // piernas + torso (CuerpoModular.js)
     this.physics.add.collider(this.jugador, this.suelo);
     if (mundo > width) this.cameras.main.startFollow(this.jugador, true, 0.15, 0);
     else this.cameras.main.stopFollow().setScroll(0, 0);
@@ -251,6 +252,7 @@ class Interior extends Phaser.Scene {
       this.bajandoHasta = this.time.now + 250; // ABAJO en el piso de arriba: se deja caer
     } else if (saltar && enSuelo && !this.saltoPresionado) {
       j.setVelocityY(-JUGADOR.salto);
+      sonarSfx(this, 'salto'); // Armas.js
     }
     this.saltoPresionado = saltar;
 

@@ -131,7 +131,226 @@ function iconoArma(arma) {
   return datos.textura ? datos.textura.replace('arma', 'icono') : datos.icono;
 }
 
+// Sonidos de las armas (assets/audio/sfx/). Cada archivo trae más de un tiro
+// (o silencio al principio): `inicio` y `dura` (segundos) son el tramo de un
+// disparo limpio, medido sobre la forma de onda:
+//   ak47           tiros sueltos en 0,4 / 1,3 / 2,3 s y una ráfaga desde 4,1 s
+//   ametralladora  un tiro cada 0,09 s
+//   escopeta       el estampido empieza en 0,6 s
+//   lanza llamas   15 s de fuego: suena en bucle mientras se dispara
+//   impacto_lanzacohetes  la explosión dura ~2 s (también la de la granada,
+//                  un poco más aguda: no tiene sonido propio)
+// El machete no tiene sonido. El volumen general es el del menú de pausa.
+// volumen: igualados a la AK-47 (los archivos vienen a distinto nivel: la
+// pistola suena el doble de fuerte y la escopeta el triple, y saturadas se
+// oían chillonas). filtro: pasa-bajos en Hz (más bajo = más opaco), para que
+// suenen con el mismo cuerpo, como de un juego y no de una grabación.
+const SFX_ARMAS = {
+  pistola: { archivo: 'pistola.mp3', inicio: 0, dura: 0.6, volumen: 0.26, filtro: 2200 },
+  ak47: { archivo: 'ak47.mp3', inicio: 0.38, dura: 0.3, volumen: 0.45, filtro: 3800 },
+  ametralladora: { archivo: 'ametralladora.mp3', inicio: 0, dura: 0.11, volumen: 0.5, filtro: 2800 },
+  escopeta: { archivo: 'escopeta.mp3', inicio: 0.58, dura: 1.0, volumen: 0.3, filtro: 2400 },
+  lanzacohetes: { archivo: 'lanzacohetes.mp3', inicio: 0, dura: 0.47, volumen: 0.6, filtro: 3200 },
+  lanzagranadas: { archivo: 'lanza_granada.mp3', inicio: 0, dura: 1.2, volumen: 0.5, filtro: 3200 },
+  lanzallamas: { archivo: 'lanza llamas.mp3', inicio: 0.1, dura: 14.5, volumen: 0.4, filtro: 2600, bucle: true }
+};
+const SFX_IMPACTOS = {
+  cohete: { archivo: 'impacto_lanzacohetes.mp3', inicio: 0.1, dura: 1.9, volumen: 0.5, filtro: 2400 },
+  granada: { archivo: 'impacto_lanzacohetes.mp3', inicio: 0.1, dura: 1.6, volumen: 0.42, tono: 1.2, filtro: 2600 }
+};
+// Otros sonidos del juego (assets/audio/sfx/): tramo de cada archivo. salto.mp3
+// trae varios saltos seguidos (18 s): se usa el primero.
+const SFX_VARIOS = {
+  salto: { archivo: 'salto.mp3', inicio: 0.6, dura: 0.35, volumen: 0.45 },
+  transformacion: { archivo: 'trasnformacion_enemigo.mp3', inicio: 0.05, dura: 7.2, volumen: 0.7 },
+  muerteEnemigo: { archivo: 'muerte_enemigo.mp3', inicio: 0.05, dura: 1.55, volumen: 0.55 }, // el jefe final
+  muerteNpc: { archivo: 'muerte_npc.mp3', inicio: 0.1, dura: 0.55, volumen: 0.55 },        // los enemigos comunes
+  // Manfred al pisar tierra en el Nivel1 (Nivel1.entradaHelicoptero). Viene grabado bajo (pico a -14 dB):
+  // volumen > 1 lo sube en el juego (+4 dB) sin tocar el archivo.
+  manfredLlega: { archivo: 'manfred_llega.mp3', inicio: 0.05, dura: 4.5, volumen: 1.6 }
+};
+
+// Un sonido de SFX_VARIOS (con un poco de variación de tono).
+function sonarSfx(escena, nombre) {
+  const sfx = SFX_VARIOS[nombre];
+  if (sfx) sonarTramo(escena, sfx, nombre);
+}
+
+// Uno largo que se puede cortar: devuelve { desvanecer(ms) } (se borra solo
+// al terminar o al cerrarse la escena).
+function sonarSfxLargo(escena, nombre) {
+  const sfx = SFX_VARIOS[nombre];
+  const nada = { desvanecer() {} };
+  if (!sfx || !escena.cache.audio.exists(claveSfx(sfx.archivo)) || escena.sound.locked) return nada;
+  const sonido = escena.sound.add(claveSfx(sfx.archivo));
+  sonido.addMarker({ name: nombre, start: sfx.inicio, duration: sfx.dura, config: { volume: sfx.volumen } });
+  sonido.once('complete', () => sonido.destroy());
+  escena.events.once('shutdown', () => { if (sonido.manager) sonido.destroy(); });
+  sonido.play(nombre);
+  return {
+    desvanecer(ms = 800) {
+      if (!sonido.manager) return;
+      escena.tweens.add({ targets: sonido, volume: 0, duration: ms, onComplete: () => { if (sonido.manager) sonido.destroy(); } });
+    }
+  };
+}
+const LLAMA_CORTE = 160; // ms sin disparar el lanzallamas para que se apague
+
+function claveSfx(archivo) {
+  return 'sfx_' + archivo.replace(/\.mp3$/, '').replace(/\s+/g, '_');
+}
+
+function cargarSfxArmas(escena) {
+  [...Object.values(SFX_ARMAS), ...Object.values(SFX_IMPACTOS), ...Object.values(SFX_VARIOS)].forEach(({ archivo }) => {
+    const clave = claveSfx(archivo);
+    if (!escena.cache.audio.exists(clave)) escena.load.audio(clave, encodeURI(`assets/audio/sfx/${archivo}`));
+  });
+}
+
+// Un sonido de `sfx` con su pasa-bajos (sfx.filtro, en Hz) entre el mute y
+// el volumen del sonido (Phaser: muteNode -> volumeNode -> panner -> salida).
+function sonidoFiltrado(escena, sfx) {
+  const sonido = escena.sound.add(claveSfx(sfx.archivo));
+  const ctx = escena.sound.context;
+  if (sfx.filtro && ctx && sonido.muteNode && sonido.volumeNode) {
+    const filtro = ctx.createBiquadFilter();
+    filtro.type = 'lowpass';
+    filtro.frequency.value = sfx.filtro;
+    filtro.Q.value = 0.7;
+    sonido.muteNode.disconnect();
+    sonido.muteNode.connect(filtro);
+    filtro.connect(sonido.volumeNode);
+  }
+  // Escenas con eco (la mina: crearEco): el sonido también entra al eco.
+  if (escena.eco && sonido.volumeNode) sonido.volumeNode.connect(escena.eco.entrada);
+  return sonido;
+}
+
+// Eco de galería (la mina): retardo con realimentación y un pasa-bajos (cada
+// repetición sale más apagada). Todos los sonidos de la escena (sonidoFiltrado)
+// y los que ella arma a mano (escena.eco.entrada) pasan por acá. Se desarma al
+// cerrar la escena. retardo en s; realimentacion y mezcla de 0 a 1.
+function crearEco(escena, { retardo = 0.26, realimentacion = 0.38, mezcla = 0.4, filtro = 1800 } = {}) {
+  const ctx = escena.sound.context;
+  if (!ctx || !ctx.createDelay) return null;
+  const destino = escena.sound.destination || escena.sound.masterVolumeNode || ctx.destination;
+  const entrada = ctx.createGain();
+  const demora = ctx.createDelay(1);
+  const vuelta = ctx.createGain();
+  const apagado = ctx.createBiquadFilter();
+  const salida = ctx.createGain();
+  demora.delayTime.value = retardo;
+  vuelta.gain.value = realimentacion;
+  apagado.type = 'lowpass';
+  apagado.frequency.value = filtro;
+  salida.gain.value = mezcla;
+  entrada.connect(demora);
+  demora.connect(apagado);
+  apagado.connect(vuelta);
+  vuelta.connect(demora);
+  apagado.connect(salida);
+  salida.connect(destino);
+  const eco = { entrada, nodos: [entrada, demora, vuelta, apagado, salida] };
+  escena.eco = eco;
+  escena.events.once('shutdown', () => {
+    eco.nodos.forEach((n) => { try { n.disconnect(); } catch (e) { /* ya desconectado */ } });
+    if (escena.eco === eco) escena.eco = null;
+  });
+  return eco;
+}
+
+// Un tramo de un archivo (se pueden superponer: cada uno es un sonido nuevo).
+function sonarTramo(escena, sfx, nombre) {
+  if (!escena.cache.audio.exists(claveSfx(sfx.archivo)) || escena.sound.locked) return;
+  const sonido = sonidoFiltrado(escena, sfx);
+  sonido.addMarker({
+    name: nombre, start: sfx.inicio, duration: sfx.dura,
+    config: { volume: sfx.volumen, rate: sfx.tono || 1, detune: Phaser.Math.Between(-60, 60) }
+  });
+  sonido.once('complete', () => sonido.destroy());
+  sonido.play(nombre);
+}
+
+// El disparo de `arma`. quien: de quién es (cada uno tiene su lanzallamas).
+function sonarArma(escena, arma, quien = 'yo') {
+  const sfx = SFX_ARMAS[arma];
+  if (!sfx) return;
+  if (!sfx.bucle) { sonarTramo(escena, sfx, arma); return; }
+  // Lanzallamas: un bucle que sigue mientras lleguen disparos.
+  const clave = claveSfx(sfx.archivo);
+  if (!escena.cache.audio.exists(clave) || escena.sound.locked) return;
+  escena.llamas = escena.llamas || {};
+  let llama = escena.llamas[quien];
+  if (!llama) {
+    const sonido = sonidoFiltrado(escena, sfx);
+    sonido.addMarker({ name: 'fuego', start: sfx.inicio, duration: sfx.dura, config: { loop: true, volume: sfx.volumen } });
+    sonido.play('fuego');
+    llama = escena.llamas[quien] = { sonido, corte: null };
+    escena.events.once('shutdown', () => sonido.destroy());
+  }
+  if (llama.corte) llama.corte.remove();
+  llama.corte = escena.time.delayedCall(LLAMA_CORTE, () => {
+    llama.sonido.destroy();
+    delete escena.llamas[quien];
+  });
+}
+
+// Sonidos del selector de armas: el mecanismo de carga que trae escopeta.mp3
+// antes del disparo (medido cada 5 ms: golpes metálicos en 0,025 / 0,08 /
+// 0,125 / 0,175 s, el corredor que vuelve de 0,3 a 0,5 s y el estampido en
+// 0,61 s, que no entra).
+const SFX_SELECTOR = {
+  agarrar: { archivo: 'escopeta.mp3', inicio: 0.015, dura: 0.06, volumen: 0.3, filtro: 4500 },  // al abrir
+  clic: { archivo: 'escopeta.mp3', inicio: 0.12, dura: 0.045, volumen: 0.32, filtro: 4500 },    // al pasar de casilla
+  cargar: { archivo: 'escopeta.mp3', inicio: 0, dura: 0.52, volumen: 0.38, filtro: 4500 }       // al equipar otra
+};
+
+// abrir / cerrar: además, un soplido (generado con WebAudio, por el volumen
+// general) que sube o baja con la cámara lenta.
+function sonarSelector(escena, tipo) {
+  if (tipo === 'abrir') sonarTramo(escena, SFX_SELECTOR.agarrar, 'sel_agarrar');
+  else if (tipo === 'mover') sonarTramo(escena, SFX_SELECTOR.clic, 'sel_clic');
+  else if (tipo === 'equipar') sonarTramo(escena, SFX_SELECTOR.cargar, 'sel_cargar');
+  if (tipo === 'abrir' || tipo === 'cerrar') soplido(escena, tipo === 'abrir');
+}
+
+function soplido(escena, sube) {
+  const ctx = escena.sound.context;
+  if (!ctx || escena.sound.locked) return;
+  const t = ctx.currentTime;
+  const salida = escena.sound.destination || ctx.destination;
+  // Ruido blanco filtrado: un golpe (clic) o un soplido (barrido de frecuencia).
+  const ruido = (inicio, dura, tipoFiltro, desde, hasta, volumen) => {
+    const largo = Math.max(1, Math.floor(ctx.sampleRate * dura));
+    const buffer = ctx.createBuffer(1, largo, ctx.sampleRate);
+    const d = buffer.getChannelData(0);
+    for (let i = 0; i < largo; i++) d[i] = Math.random() * 2 - 1;
+    const fuente = ctx.createBufferSource();
+    fuente.buffer = buffer;
+    const filtro = ctx.createBiquadFilter();
+    filtro.type = tipoFiltro;
+    filtro.Q.value = tipoFiltro === 'bandpass' ? 4 : 0.8;
+    filtro.frequency.setValueAtTime(desde, t + inicio);
+    filtro.frequency.exponentialRampToValueAtTime(hasta, t + inicio + dura);
+    const vol = ctx.createGain();
+    vol.gain.setValueAtTime(0.0001, t + inicio);
+    vol.gain.exponentialRampToValueAtTime(volumen, t + inicio + Math.min(0.01, dura / 3));
+    vol.gain.exponentialRampToValueAtTime(0.0001, t + inicio + dura);
+    fuente.connect(filtro).connect(vol).connect(salida);
+    fuente.start(t + inicio);
+    fuente.stop(t + inicio + dura + 0.02);
+  };
+  if (sube) ruido(0, 0.2, 'lowpass', 300, 2200, 0.12);
+  else ruido(0, 0.16, 'lowpass', 2000, 300, 0.08);
+}
+
+// La explosión de un cohete o una granada.
+function sonarImpacto(escena, tipo) {
+  if (SFX_IMPACTOS[tipo]) sonarTramo(escena, SFX_IMPACTOS[tipo], 'impacto_' + tipo);
+}
+
 function cargarArmas(escena) {
+  cargarSfxArmas(escena);
   const archivos = { armaAk47: 'ak47', armaAmetralladora: 'ametralladora', armaEscopeta: 'escopeta', armaLanzacohetes: 'lanzacohetes',
     armaLanzagranadas: 'lanzagranadas', armaLanzallamas: 'lanzallamas', armaMachete: 'machete' };
   escena.load.image('armaPistola', 'assets/armas/pistola.png');
@@ -175,10 +394,27 @@ function texturaArma(nombre) {
   return ARMAS[nombre].textura || 'armaPistola';
 }
 
+// Elevación del arma en grados (0 adelante, 45 diagonal, 90 arriba): `arriba`
+// puede ser true (90) o los grados.
+function elevacionArma(arriba) {
+  return arriba === true ? 90 : arriba || 0;
+}
+
+// Ángulo del disparo (grados de Phaser: 0 a la derecha, -90 arriba) mirando
+// a `lado` con esa elevación.
+function anguloDisparo(lado, elevacion) {
+  return lado < 0 ? 180 + elevacion : -elevacion;
+}
+
+// Espejo y giro del fogonazo de la escopeta (dibujado hacia la derecha).
+function fxEscopetazo(lado, elevacion) {
+  return elevacion === 90 ? { espejo: false, angulo: -90 } : { espejo: lado < 0, angulo: -elevacion * lado };
+}
+
 // Pone la imagen del arma con la empuñadura en `mano` (px de pantalla),
-// mirando a `lado` (1 derecha, -1 izquierda): 0° adelante, -90° arriba
-// (gira alrededor de la empuñadura). Devuelve la punta del caño respecto de
-// la mano (px de pantalla).
+// mirando a `lado` (1 derecha, -1 izquierda), levantada `arriba` (true o
+// grados: 0 adelante, 45 diagonal, 90 arriba; gira alrededor de la
+// empuñadura). Devuelve la punta del caño respecto de la mano (px de pantalla).
 function colocarArma(escena, imagen, nombre, mano, lado, arriba) {
   const d = ARMAS[nombre];
   const textura = texturaArma(nombre);
@@ -187,7 +423,7 @@ function colocarArma(escena, imagen, nombre, mano, lado, arriba) {
     .setOrigin(lado < 0 ? 1 - d.agarre : d.agarre, d.agarreY)
     .setPosition(mano.x, mano.y);
   // Durante el tajo del machete el ángulo lo maneja el tween.
-  if (escena.time.now >= (escena.tajoHasta || 0)) imagen.setAngle(arriba ? -90 * lado : 0);
+  if (escena.time.now >= (escena.tajoHasta || 0)) imagen.setAngle(-elevacionArma(arriba) * lado);
   return bocaDesdeMano(escena, nombre, lado, arriba);
 }
 
@@ -196,7 +432,9 @@ function bocaDesdeMano(escena, nombre, lado, arriba) {
   const img = escena.textures.get(texturaArma(nombre)).getSourceImage();
   const adelante = img.width * ESCALA_ARMA * (1 - d.agarre);
   const subir = img.height * ESCALA_ARMA * (d.agarreY - d.cano); // el caño va más arriba que la mano
-  return arriba ? { x: -lado * subir, y: -adelante } : { x: lado * adelante, y: -subir };
+  // (adelante, -subir) girado la elevación hacia arriba, espejado si mira a la izquierda.
+  const r = Phaser.Math.DegToRad(elevacionArma(arriba));
+  return { x: lado * (adelante * Math.cos(r) - subir * Math.sin(r)), y: -adelante * Math.sin(r) - subir * Math.cos(r) };
 }
 
 function ponerMunicion(escena, arma, cantidad) {
@@ -601,6 +839,7 @@ function abrirSelector(escena) {
   });
   escena.selectorArmas = sel;
   dibujarSelector(escena);
+  sonarSelector(escena, 'abrir');
 }
 
 // equipar: si se equipa la elegida (al soltar TAB) o se cierra sin cambiar
@@ -616,6 +855,9 @@ function cerrarSelector(escena, equipar) {
   if (equipar && sel.elegida !== armaJugador(escena) && municionDe(escena, sel.elegida) > 0) {
     escena.registry.set('arma', sel.elegida);
     if (escena.hudArma) actualizarHudArma(escena, escena.hudArma);
+    sonarSelector(escena, 'equipar');
+  } else if (equipar) {
+    sonarSelector(escena, 'cerrar');
   }
 }
 
@@ -641,7 +883,10 @@ function elegirEnSelector(escena) {
     if (arma) sel.elegida = arma;
     sel.puntero = { x: p.x, y: p.y };
   }
-  if (sel.elegida !== antes) dibujarSelector(escena);
+  if (sel.elegida !== antes) {
+    dibujarSelector(escena);
+    sonarSelector(escena, 'mover');
+  }
 }
 
 function dibujarSelector(escena) {

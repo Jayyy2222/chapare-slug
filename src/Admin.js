@@ -31,6 +31,32 @@ const ADMIN = { clave: 'jaime', velocidad: 520, rapido: 2.2 };
   });
 })();
 
+// Truco secreto: escribir "vida" con el teclado en cualquier momento prende la
+// inmunidad (no recibe daño; en la arena, caerse no le quita vidas); escribirlo
+// otra vez la apaga. Se guarda en el registry ('inmune').
+const INMUNIDAD = { clave: 'vida' };
+
+(function escucharClaveInmunidad() {
+  let escrito = '';
+  window.addEventListener('keydown', (ev) => {
+    if (!ev.key || ev.key.length !== 1) return;
+    escrito = (escrito + ev.key.toLowerCase()).slice(-INMUNIDAD.clave.length);
+    if (escrito !== INMUNIDAD.clave || !window.juego) return;
+    escrito = '';
+    const activo = !window.juego.registry.get('inmune');
+    window.juego.registry.set('inmune', activo);
+    window.juego.scene.getScenes(true).forEach((escena) => avisoTruco(escena, activo ? '¡INMUNIDAD ACTIVADA!' : 'INMUNIDAD APAGADA', activo));
+  });
+})();
+
+function avisoTruco(escena, texto, activo) {
+  if (!escena.add || !escena.scale) return;
+  const { width, height } = escena.scale;
+  const t = TextFX.texto(escena, width / 2, height / 2 - 120, texto, { color: activo ? 'oro' : 'plata', escala: 3 })
+    .setScrollFactor(0).setDepth(60);
+  escena.tweens.add({ targets: t, alpha: 0, delay: 1200, duration: 500, onComplete: () => t.destroy() });
+}
+
 // Si se acaba de escribir la clave (para ignorar sus letras como comandos).
 function recienClaveAdmin() {
   return performance.now() - (window.claveAdminEn || 0) < 400;
