@@ -1,0 +1,62 @@
+{
+ "huida": {
+  "ancho": 144,
+  "alto": 161,
+  "cuadros": 8
+ },
+ "sube": {
+  "ancho": 108,
+  "alto": 164,
+  "cuadros": 6
+ },
+ "burla": {
+  "ancho": 80,
+  "alto": 93,
+  "cuadros": 6
+ },
+ "coronel": {
+  "ancho": 39,
+  "alto": 55,
+  "cuadros": 8
+ },
+ "helicoptero": {
+  "ancho": 876,
+  "alto": 248,
+  "cuadros": 4,
+  "ancla": [
+   438,
+   195
+  ],
+  "puerta": [
+   -41,
+   -82,
+   61,
+   81
+  ],
+  "ventanilla": [
+   -88,
+   -75,
+   34,
+   46
+  ],
+  "rotor": {
+   "principal": [
+    -5,
+    -163,
+    366
+   ],
+   "cola": [
+    330,
+    -108,
+    39
+   ]
+  }
+ },
+ "escalas": {
+  "huida": 0.36,
+  "sube": 0.36,
+  "burla": 0.24,
+  "coronel": 0.17,
+  "helicoptero": 0.85
+ }
+}

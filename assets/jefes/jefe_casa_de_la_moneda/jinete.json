@@ -1,0 +1,146 @@
+{
+ "galope": {
+  "ancho": 313,
+  "alto": 228,
+  "cuadros": 6,
+  "origen": [
+   0.5144,
+   0.9693
+  ]
+ },
+ "ataque": {
+  "ancho": 209,
+  "alto": 278,
+  "cuadros": 5,
+  "origen": [
+   0.5215,
+   0.9928
+  ]
+ },
+ "lanza": {
+  "ancho": 220,
+  "alto": 219,
+  "cuadros": 6,
+  "origen": [
+   0.5091,
+   0.9909
+  ]
+ },
+ "muerte": {
+  "ancho": 254,
+  "alto": 219,
+  "cuadros": 11,
+  "origen": [
+   0.5118,
+   0.9863
+  ]
+ },
+ "sale": {
+  "ancho": 200,
+  "alto": 238,
+  "cuadros": 8,
+  "origen": [
+   0.53,
+   0.9874
+  ]
+ },
+ "bola": {
+  "ancho": 121,
+  "alto": 118,
+  "cuadros": 10,
+  "origen": [
+   0.5,
+   0.5
+  ]
+ },
+ "portal": {
+  "ancho": 218,
+  "alto": 132,
+  "cuadros": 18,
+  "origen": [
+   0.5,
+   0.9924
+  ]
+ },
+ "portal_luz": {
+  "ancho": 160,
+  "alto": 186,
+  "cuadros": 4,
+  "origen": [
+   0.5,
+   0.9946
+  ]
+ },
+ "fx_llama": {
+  "ancho": 42,
+  "alto": 46,
+  "cuadros": 4,
+  "origen": [
+   0.5,
+   0.9783
+  ]
+ },
+ "fx_muro": {
+  "ancho": 383,
+  "alto": 40,
+  "cuadros": 3,
+  "origen": [
+   0.5,
+   0.975
+  ]
+ },
+ "fx_pilar": {
+  "ancho": 188,
+  "alto": 165,
+  "cuadros": 5,
+  "origen": [
+   0.5,
+   0.9939
+  ]
+ },
+ "fx_caballo": {
+  "ancho": 245,
+  "alto": 118,
+  "cuadros": 4,
+  "origen": [
+   0.5,
+   0.9915
+  ]
+ },
+ "fx_niebla": {
+  "ancho": 684,
+  "alto": 69,
+  "cuadros": 1,
+  "origen": [
+   0.5,
+   0.9855
+  ]
+ },
+ "fx_explota": {
+  "ancho": 169,
+  "alto": 118,
+  "cuadros": 5,
+  "origen": [
+   0.5,
+   0.9915
+  ]
+ },
+ "fx_calavera": {
+  "ancho": 69,
+  "alto": 72,
+  "cuadros": 3,
+  "origen": [
+   0.5,
+   0.5
+  ]
+ },
+ "fx_rayo": {
+  "ancho": 167,
+  "alto": 66,
+  "cuadros": 4,
+  "origen": [
+   0.5,
+   0.5
+  ]
+ }
+}

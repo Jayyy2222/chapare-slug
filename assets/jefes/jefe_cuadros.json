@@ -5,7 +5,7 @@
   "cuadros": 6
  },
  "jefe": {
-  "ancho": 88,
+  "ancho": 85,
   "alto": 79,
   "pose": [
    0,
@@ -25,7 +25,7 @@
   ]
  },
  "gigante": {
-  "ancho": 215,
+  "ancho": 257,
   "alto": 127,
   "aparece": [
    0,
@@ -33,15 +33,15 @@
   ],
   "caminar": [
    2,
-   8
+   5
   ],
   "ataque": [
-   9,
-   16
+   6,
+   13
   ],
   "muerte": [
-   17,
-   25
+   14,
+   22
   ]
  }
 }
